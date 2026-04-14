@@ -50,7 +50,7 @@ def _g(d, e, a, m): return d.get((e,a,m), 0)
 
 st.markdown("""
 <div style="background:#1a1a2e;padding:16px 24px;border-radius:12px;margin-bottom:20px">
-<h1 style="color:white;margin:0;font-size:1.5rem">Oportunidades</h1>
+<h1 style="color:white;margin:0;font-size:1.8rem">💼 OPORTUNIDADES</h1>
 <p style="color:#EC8500;margin:2px 0 0 0;font-size:0.85rem">Orcamentos, vendas e pipeline por empresa</p>
 </div>
 """, unsafe_allow_html=True)
@@ -83,8 +83,8 @@ try:
     # ========================================
     # SECAO 1: CARD + PIPELINE por empresa
     # ========================================
-    st.markdown(f"### {MESES_PT[m]}/{a} — Orcamentos, Vendas e Pipeline")
-    st.caption(f"Comparacao com {n_ant} normalizada por dias uteis")
+    st.markdown(f'<h3 style="font-size:1.3rem;color:#1a1a2e">\U0001f4bc ORCAMENTOS, VENDAS E PIPELINE \u2014 {MESES_PT[m].upper()}/{a}</h3>', unsafe_allow_html=True)
+    st.markdown(f'<p style="color:#666;font-size:0.9rem;margin-top:-8px">Card de cada empresa + pipeline detalhado por fase \u2014 vs {n_ant} (por dia util)</p>', unsafe_allow_html=True)
 
     for emp in empresas_ex:
         cor = CORES.get(emp,{}).get("primaria","#1a1a2e")
@@ -169,8 +169,12 @@ try:
                     hdr = f'<div style="display:flex;padding:4px 8px;border-bottom:2px solid #ddd"><div style="flex:2;font-size:0.6rem;color:#999;text-transform:uppercase">Fase</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">Qtd</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">{unid}</div><div style="flex:2;font-size:0.6rem;color:#999;text-transform:uppercase;padding-left:8px">Distribuicao</div></div>'
 
                     st.markdown(f"""
-<div style="background:#FAFAFA;border-radius:0 0 12px 12px;padding:10px 16px;margin-bottom:16px;border-left:5px solid {cor};border-top:1px dashed #ddd">
-<div style="font-size:0.7rem;color:#888;font-weight:600;margin-bottom:6px">PIPELINE ABERTO \u2014 {_fmt(total_pipe)} opps \u00b7 {tvf}</div>
+<div style="background:#FAFAFA;border-radius:0 0 12px 12px;padding:14px 20px;margin-bottom:16px;border-left:5px solid {cor};border-top:1px dashed #ddd">
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #eee">
+<div style="font-size:0.75rem;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">PIPELINE ABERTO</div>
+<div style="font-size:1.4rem;font-weight:800;color:{cor}">{_fmt(total_pipe)} <span style="font-size:0.8rem;font-weight:600;color:#888">opps</span></div>
+<div style="font-size:1.4rem;font-weight:800;color:#1a1a2e">{tvf}</div>
+</div>
 {hdr}{rows}
 </div>
 """, unsafe_allow_html=True)
@@ -180,7 +184,8 @@ try:
     # ========================================
     # SECAO 2: EVOLUCAO MES A MES por empresa
     # ========================================
-    st.markdown("### Evolucao Mes a Mes")
+    st.markdown('<h3 style="font-size:1.3rem;color:#1a1a2e">\U0001f4c5 EVOLUCAO MES A MES</h3>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#666;font-size:0.9rem;margin-top:-8px">Orcamentos, vendas e volume dos ultimos 6 meses por empresa</p>', unsafe_allow_html=True)
 
     meses = []
     mx, ax = m, a

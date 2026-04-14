@@ -42,7 +42,7 @@ def _g(d, e, a, m): return d.get((e,a,m), 0)
 
 st.markdown("""
 <div style="background:#1a1a2e;padding:16px 24px;border-radius:12px;margin-bottom:20px">
-<h1 style="color:white;margin:0;font-size:1.5rem">Leads</h1>
+<h1 style="color:white;margin:0;font-size:1.8rem">👥 LEADS</h1>
 <p style="color:#EC8500;margin:2px 0 0 0;font-size:0.85rem">Geracao, conversao, %F1, origens e funil — por empresa</p>
 </div>
 """, unsafe_allow_html=True)
@@ -72,8 +72,8 @@ try:
     # ========================================
     # SUBSECAO 1: CARDS DO MES com %F1
     # ========================================
-    st.markdown(f"### Mes Vigente — {MESES_PT[m]}/{a}")
-    st.caption(f"{du_h} de {du_t} DU | %F1 = criados E convertidos no mesmo mes")
+    st.markdown(f'<h3 style="font-size:1.3rem;color:#1a1a2e">\U0001f4c5 MES VIGENTE \u2014 {MESES_PT[m].upper()}/{a}</h3>', unsafe_allow_html=True)
+    st.markdown(f'<p style="color:#666;font-size:0.9rem;margin-top:-8px">{du_h} de {du_t} DU | %F1 = criados E convertidos no mesmo mes</p>', unsafe_allow_html=True)
 
     for emp in empresas_ex:
         cor = CORES.get(emp,{}).get("primaria","#1a1a2e")
@@ -130,7 +130,7 @@ try:
     # ========================================
     # SUBSECAO 2: ORIGENS DO MES por empresa
     # ========================================
-    st.markdown(f"### Origens de Leads — {MESES_PT[m]}/{a}")
+    st.markdown(f'<h3 style="font-size:1.3rem;color:#1a1a2e">\U0001f3af ORIGENS DE LEADS \u2014 {MESES_PT[m].upper()}/{a}</h3>', unsafe_allow_html=True)
 
     if not df_origens.empty:
         df_or = df_origens[(df_origens["ano"]==a) & (df_origens["mes"]==m)]
@@ -159,8 +159,8 @@ try:
     # ========================================
     # SUBSECAO 3: FUNIL DE STATUS — tabela por empresa
     # ========================================
-    st.markdown(f"### Funil de Status — {MESES_PT[m]}/{a}")
-    st.caption("Distribuicao de leads criados no mes por status atual")
+    st.markdown(f'<h3 style="font-size:1.3rem;color:#1a1a2e">\U0001f50d FUNIL DE STATUS \u2014 {MESES_PT[m].upper()}/{a}</h3>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#666;font-size:0.9rem;margin-top:-8px">Distribuicao dos leads criados no mes por status atual</p>', unsafe_allow_html=True)
 
     d_ini = date(a, m, 1)
     STATUS_ORDEM = ["Aberto","Em Contato","Em Interacao","Transferencia Vendedor","Objecao Comercial","Aceite","Recuperacao","Stand-by Retrabalho","Fechado Convertido","Fechado Nao Convertido"]
@@ -203,7 +203,8 @@ try:
     # ========================================
     # SUBSECAO 4: EVOLUCAO MES A MES por empresa
     # ========================================
-    st.markdown("### Evolucao Mes a Mes")
+    st.markdown('<h3 style="font-size:1.3rem;color:#1a1a2e">\U0001f4c5 EVOLUCAO MES A MES</h3>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#666;font-size:0.9rem;margin-top:-8px">Historico dos ultimos 6 meses por empresa</p>', unsafe_allow_html=True)
 
     meses_ex = []
     mx, ax = m, a

@@ -36,7 +36,7 @@ def _fk(v):
 
 st.markdown("""
 <div style="background:#1a1a2e;padding:16px 24px;border-radius:12px;margin-bottom:20px">
-<h1 style="color:white;margin:0;font-size:1.5rem">Vendas</h1>
+<h1 style="color:white;margin:0;font-size:1.8rem">🏆 VENDAS</h1>
 <p style="color:#EC8500;margin:2px 0 0 0;font-size:0.85rem">Historico mensal com grafico de evolucao — Energy em kWh, demais em R$</p>
 </div>
 """, unsafe_allow_html=True)
@@ -105,25 +105,27 @@ try:
         # Grafico de linhas com 2 eixos
         fig = go.Figure()
 
-        # Linha 1: Quantidade de vendas (eixo esquerdo)
+        vol_label = "Energia (kWh)" if ie else "Valor Vendido (R$)"
+
+        # Linha 1: Vendas — DESTAQUE (mais grossa)
         fig.add_trace(go.Scatter(
-            x=meses_label, y=vendas_qtd, name="Vendas (qtd)",
+            x=meses_label, y=vendas_qtd, name="Vendas",
             mode="lines+markers+text",
-            line=dict(color=cor, width=3),
-            marker=dict(size=10, color=cor, symbol="circle"),
+            line=dict(color="#2E7D32", width=4),
+            marker=dict(size=12, color="#2E7D32", symbol="circle", line=dict(width=2, color="white")),
             text=[str(v) for v in vendas_qtd], textposition="top center",
-            textfont=dict(size=11, color=cor, family="Arial Black"),
+            textfont=dict(size=12, color="#2E7D32", family="Arial Black"),
             yaxis="y",
         ))
 
-        # Linha 2: Volume — valor ou kWh (eixo direito)
+        # Linha 2: Volume — secundaria
         fig.add_trace(go.Scatter(
-            x=meses_label, y=vendas_vol, name=f"Volume ({unid})",
+            x=meses_label, y=vendas_vol, name=vol_label,
             mode="lines+markers+text",
-            line=dict(color="#2E7D32", width=2, dash="dash"),
-            marker=dict(size=8, color="#2E7D32", symbol="diamond"),
+            line=dict(color=cor, width=2, dash="dot"),
+            marker=dict(size=7, color=cor, symbol="diamond"),
             text=[_fk(v) if ie else _fv(v) for v in vendas_vol], textposition="bottom center",
-            textfont=dict(size=10, color="#2E7D32"),
+            textfont=dict(size=9, color=cor),
             yaxis="y2",
         ))
 
@@ -141,12 +143,13 @@ try:
         st.plotly_chart(fig, use_container_width=True)
 
         # Tabela compacta
+        col_vol = "Energia (kWh)" if ie else "Valor Vendido"
         tab = []
         for i, (ano, mes) in enumerate(meses_af):
             du = dias_uteis_no_mes(ano, mes)
             vol_fmt = _fk(vendas_vol[i]) if ie else _fv(vendas_vol[i])
             vdu = f"{vendas_qtd[i]/du:.1f}" if du > 0 else "\u2014"
-            tab.append({"Mes": MESES_PT[mes], "DU": du, "Vendas": vendas_qtd[i], "V/DU": vdu, "Volume": vol_fmt})
+            tab.append({"Mes": MESES_PT[mes], "DU": du, "Vendas": vendas_qtd[i], "V/DU": vdu, col_vol: vol_fmt})
         st.dataframe(pd.DataFrame(tab), width="stretch", hide_index=True)
         st.markdown("---")
 

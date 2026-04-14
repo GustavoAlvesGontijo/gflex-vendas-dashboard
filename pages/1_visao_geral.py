@@ -129,8 +129,8 @@ try:
     # ========================================
     # SECAO 1: VENDAS + PIPELINE por empresa
     # ========================================
-    st.markdown("### Vendas no Mes + Pipeline")
-    st.caption(f"Vendido vs em negociacao/contrato — {MESES_PT[m]}/{a} vs {n_ant} (por DU)")
+    st.markdown(f'<h3 style="font-size:1.3rem;color:#1a1a2e">\U0001f4c8 VENDAS + PIPELINE — {MESES_PT[m].upper()}/{a}</h3>', unsafe_allow_html=True)
+    st.markdown(f'<p style="color:#666;font-size:0.9rem;margin-top:-8px">O que ja vendemos, o que esta em negociacao e o pipeline total \u2014 cada empresa vs {n_ant} (por dia util)</p>', unsafe_allow_html=True)
 
     icones = {"Flex Energy":"\u26a1","GF2 Solu\u00e7\u00f5es Integradas":"\U0001f529","Flex Tendas":"\u26fa","Flex Medi\u00e7\u00f5es":"\U0001f52c","MEC Estruturas Met\u00e1licas":"\U0001f3d7\ufe0f","Flex Solar":"\u2600\ufe0f"}
 
@@ -206,50 +206,10 @@ try:
     st.markdown("---")
 
     # ========================================
-    # SECAO 2: TRIMESTRE Q atual vs Q anterior
+    # SECAO 2: COMBUSTIVEIS com soma
     # ========================================
-    st.markdown(f"### Trimestre Q{tri} vs Q{tri_a}")
-    st.caption("Cada empresa vs ela mesma — normalizado por dias uteis")
-
-    du_tri = sum(dias_uteis_no_mes(ax,mx) for ax,mx in meses_tri)
-    du_tri_a = sum(dias_uteis_no_mes(ax,mx) for ax,mx in meses_tri_a)
-
-    tri_d = []
-    for emp in EMPRESAS:
-        label = EMPRESA_LABELS[emp]
-        ie = (emp == "Flex Energy")
-        gt = sum(_g(ganhas_q,emp,ax,mx) for ax,mx in meses_tri)
-        ga = sum(_g(ganhas_q,emp,ax,mx) for ax,mx in meses_tri_a)
-        gvt = sum(_g(ganhas_v,emp,ax,mx) for ax,mx in meses_tri)
-        gva = sum(_g(ganhas_v,emp,ax,mx) for ax,mx in meses_tri_a)
-        ot = sum(_g(opps_q,emp,ax,mx) for ax,mx in meses_tri)
-        oa = sum(_g(opps_q,emp,ax,mx) for ax,mx in meses_tri_a)
-        def _vdu(at,da,an,db):
-            if da==0 or db==0 or an==0: return "\u2014"
-            p = ((at/da-an/db)/(an/db))*100
-            return f"{p:+.0f}%"
-        row = {"Empresa": label}
-        row[f"Vendas Q{tri}"] = int(gt)
-        row[f"Vendas Q{tri_a}"] = int(ga)
-        row["Var"] = _vdu(gt,du_tri,ga,du_tri_a)
-        if ie:
-            row[f"Vol Q{tri}"] = _fk(gvt)
-            row[f"Vol Q{tri_a}"] = _fk(gva)
-        else:
-            row[f"Vol Q{tri}"] = _fv(gvt)
-            row[f"Vol Q{tri_a}"] = _fv(gva)
-        row[f"Orcs Q{tri}"] = int(ot)
-        row[f"Orcs Q{tri_a}"] = int(oa)
-        tri_d.append(row)
-    st.dataframe(pd.DataFrame(tri_d), width="stretch", hide_index=True)
-
-    st.markdown("---")
-
-    # ========================================
-    # SECAO 3: COMBUSTIVEIS com soma
-    # ========================================
-    st.markdown("### Combustiveis — Performance por Origem")
-    st.caption(f"Leads criados, orcamentos e vendas no mes de {MESES_PT[m]}/{a} — por empresa e canal")
+    st.markdown(f'<h3 style="font-size:1.3rem;color:#1a1a2e">\u26fd COMBUSTIVEIS — PERFORMANCE POR ORIGEM</h3>', unsafe_allow_html=True)
+    st.markdown(f'<p style="color:#666;font-size:0.9rem;margin-top:-8px">De onde vem os leads e quantos viram orcamento e venda \u2014 {MESES_PT[m]}/{a}</p>', unsafe_allow_html=True)
 
     ORIGENS = ["Meta ADS","Google Ads","Website","Exact Sales","Instagram","Indicacao","Feira","Prospeccao Ativa Vendedor"]
     d_ini = date(a, m, 1)
@@ -297,7 +257,8 @@ try:
     # ========================================
     # SECAO 4: EVOLUCAO MES A MES — POR EMPRESA
     # ========================================
-    st.markdown("### Evolucao Mes a Mes — Por Empresa")
+    st.markdown('<h3 style="font-size:1.3rem;color:#1a1a2e">\U0001f4c5 EVOLUCAO MES A MES</h3>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#666;font-size:0.9rem;margin-top:-8px">Historico dos ultimos 6 meses \u2014 leads, conversoes, orcamentos e vendas por empresa</p>', unsafe_allow_html=True)
 
     meses_ex = []
     mx, ax = m, a
