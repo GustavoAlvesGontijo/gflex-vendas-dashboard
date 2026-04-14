@@ -52,12 +52,12 @@ CORES_EMPRESAS_LISTA = [
 # --- Fases de Oportunidades (pipeline padrao) ---
 FASES_PIPELINE = [
     "Novo",
-    "Em Analise",
+    "Em An\u00e1lise",
     "Contato Ativo",
     "Contato Passivo",
-    "Negociacao",
+    "Negocia\u00e7\u00e3o",
     "Contrato",
-    "Em Cotacao",
+    "Em Cota\u00e7\u00e3o",
     "Fechado Ganho",
     "Fechado Perdido",
 ]

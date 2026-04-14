@@ -97,16 +97,23 @@ try:
         for _, r in df_kwh.iterrows():
             kwh_m[(int(r["ano"]),int(r["mes"]))] = float(r["total_kwh"]) if r["total_kwh"] else 0
 
-    # Pipeline aberto por empresa
-    pipe_emp = {}
-    pipe_emp_val = {}
+    # Pipeline aberto por empresa — separar negociacao/contrato vs prospeccao
+    pipe_neg = {}  # Negociacao + Contrato (quentes)
+    pipe_neg_val = {}
+    pipe_total = {}  # Todo o pipeline aberto
+    pipe_total_val = {}
     if not df_pipe.empty:
-        fases_quentes = ["Negociacao","Contrato","Em Cotacao"]
+        # Nomes com acentos conforme SF
+        fases_negociacao = ["Negocia\u00e7\u00e3o", "Contrato", "Negociacao"]
         for _, r in df_pipe.iterrows():
             e = r.get("Empresa_Proprietaria__c","")
-            if r["StageName"] in fases_quentes:
-                pipe_emp[e] = pipe_emp.get(e,0) + int(r["total"])
-                pipe_emp_val[e] = pipe_emp_val.get(e,0) + (float(r["valor"]) if r["valor"] else 0)
+            qtd = int(r["total"])
+            val = float(r["valor"]) if r["valor"] else 0
+            pipe_total[e] = pipe_total.get(e,0) + qtd
+            pipe_total_val[e] = pipe_total_val.get(e,0) + val
+            if r["StageName"] in fases_negociacao:
+                pipe_neg[e] = pipe_neg.get(e,0) + qtd
+                pipe_neg_val[e] = pipe_neg_val.get(e,0) + val
 
     # ========================================
     # SECAO 1: VENDAS + PIPELINE por empresa
@@ -127,42 +134,51 @@ try:
         lq = _g(leads_t, emp, a, m); lq_a = _g(leads_t, emp, a_a, m_a)
         oq = _g(opps_q, emp, a, m); oq_a = _g(opps_q, emp, a_a, m_a)
 
-        # Pipeline quente
-        pq = pipe_emp.get(emp, 0)
-        pv = pipe_emp_val.get(emp, 0)
+        # Pipeline: negociacao+contrato vs total
+        pn = pipe_neg.get(emp, 0)
+        pnv = pipe_neg_val.get(emp, 0)
+        pt = pipe_total.get(emp, 0)
+        ptv = pipe_total_val.get(emp, 0)
 
-        # Volume
+        # Volume vendido
         if ie:
             kh = kwh_m.get((a,m),0); kh_a = kwh_m.get((a_a,m_a),0)
             vol = _fk(kh); vol_a = _fk(kh_a); vol_lab = "Energia"; v_vol = _var(kh, du_h, kh_a, du_ant)
-            pipe_vol = _fk(pv)
+            neg_vol = _fk(pnv); pipe_vol = _fk(ptv)
         else:
             vol = _fv(gv); vol_a = _fv(gv_a); vol_lab = "Valor"; v_vol = _var(gv, du_h, gv_a, du_ant)
-            pipe_vol = _fv(pv)
+            neg_vol = _fv(pnv); pipe_vol = _fv(ptv)
 
         v_gq = _var(gq, du_h, gq_a, du_ant)
         v_lq = _var(lq, du_h, lq_a, du_ant)
         v_oq = _var(oq, du_h, oq_a, du_ant)
 
         st.markdown(f"""
-<div style="background:white;border-radius:12px;padding:16px 20px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-left:5px solid {cor}">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-<span style="font-weight:700;color:{cor};font-size:1.05rem">{ic} {label}</span>
+<div style="background:white;border-radius:12px;padding:16px 20px;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,0,0,0.06);border-left:5px solid {cor}">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+<span style="font-weight:700;color:{cor};font-size:1.1rem">{ic} {label}</span>
 <span style="font-size:0.7rem;color:#999">vs {n_ant} (por DU)</span>
 </div>
-<div style="display:flex;gap:12px;flex-wrap:wrap">
-<div style="flex:1;min-width:220px;background:#F1F8E9;border-radius:10px;padding:12px 16px">
-<div style="font-size:0.65rem;color:#558B2F;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;margin-bottom:6px">Vendido no Mes</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<div style="flex:1;min-width:180px;background:#E8F5E9;border-radius:10px;padding:12px 16px">
+<div style="font-size:0.6rem;color:#2E7D32;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:6px">\u2705 Vendido no Mes</div>
 <div style="display:flex;gap:16px">
-<div style="text-align:center"><div style="font-size:1.4rem;font-weight:700;color:#2E7D32">{_fmt(gq)}</div><div style="font-size:0.55rem;color:#888">vendas {v_gq}</div></div>
-<div style="text-align:center"><div style="font-size:1.4rem;font-weight:700;color:#2E7D32">{vol}</div><div style="font-size:0.55rem;color:#888">{vol_lab} {v_vol}</div></div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#2E7D32">{_fmt(gq)}</div><div style="font-size:0.55rem;color:#666">vendas {v_gq}</div></div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#2E7D32">{vol}</div><div style="font-size:0.55rem;color:#666">{vol_lab} {v_vol}</div></div>
 </div>
 </div>
-<div style="flex:1;min-width:220px;background:#FFF3E0;border-radius:10px;padding:12px 16px">
-<div style="font-size:0.65rem;color:#E65100;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;margin-bottom:6px">Em Negociacao + Contrato</div>
+<div style="flex:1;min-width:180px;background:#FFF3E0;border-radius:10px;padding:12px 16px">
+<div style="font-size:0.6rem;color:#E65100;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:6px">\U0001f525 Negociacao + Contrato</div>
 <div style="display:flex;gap:16px">
-<div style="text-align:center"><div style="font-size:1.4rem;font-weight:700;color:#E65100">{_fmt(pq)}</div><div style="font-size:0.55rem;color:#888">opps quentes</div></div>
-<div style="text-align:center"><div style="font-size:1.4rem;font-weight:700;color:#E65100">{pipe_vol}</div><div style="font-size:0.55rem;color:#888">{vol_lab}</div></div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#E65100">{_fmt(pn)}</div><div style="font-size:0.55rem;color:#666">opps</div></div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#E65100">{neg_vol}</div><div style="font-size:0.55rem;color:#666">{vol_lab}</div></div>
+</div>
+</div>
+<div style="flex:1;min-width:180px;background:#E3F2FD;border-radius:10px;padding:12px 16px">
+<div style="font-size:0.6rem;color:#1565C0;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:6px">\U0001f4cb Pipeline Total</div>
+<div style="display:flex;gap:16px">
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#1565C0">{_fmt(pt)}</div><div style="font-size:0.55rem;color:#666">opps abertas</div></div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#1565C0">{pipe_vol}</div><div style="font-size:0.55rem;color:#666">{vol_lab}</div></div>
 </div>
 </div>
 <div style="flex:1;min-width:180px;padding:12px 16px">

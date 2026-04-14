@@ -132,7 +132,7 @@ try:
         if not df_pipe.empty:
             df_e = df_pipe[df_pipe["Empresa_Proprietaria__c"]==emp].copy()
             if not df_e.empty:
-                ordem = {s:i for i,s in enumerate(FASES_PIPELINE + ["Em Analise"])}
+                ordem = {s:i for i,s in enumerate(FASES_PIPELINE)}
                 df_e["ord"] = df_e["StageName"].map(ordem).fillna(99)
                 df_e = df_e.sort_values("ord")
                 df_e = df_e[~df_e["StageName"].isin(["Fechado Ganho","Fechado Perdido"])]
