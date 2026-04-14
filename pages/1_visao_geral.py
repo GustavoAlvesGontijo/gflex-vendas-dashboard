@@ -18,6 +18,7 @@ from salesforce_client import (
     get_opps_ganhas_mensal_por_empresa,
     get_energy_kwh_mensal,
     get_pipeline_aberto_por_empresa,
+    get_energy_pipeline_kwh,
     get_opps_por_origem_empresa,
     get_origens_funil_por_empresa,
     get_leads_convertidos_no_mes_por_empresa,
@@ -97,14 +98,18 @@ try:
         for _, r in df_kwh.iterrows():
             kwh_m[(int(r["ano"]),int(r["mes"]))] = float(r["total_kwh"]) if r["total_kwh"] else 0
 
-    # Pipeline aberto por empresa — separar negociacao/contrato vs prospeccao
-    pipe_neg = {}  # Negociacao + Contrato (quentes)
+    # Pipeline Energy kWh (real, via OpportunityLineItem)
+    energy_pipe_kwh = get_energy_pipeline_kwh()
+    energy_pipe_kwh_total = sum(energy_pipe_kwh.values())
+    energy_pipe_kwh_neg = sum(v for k, v in energy_pipe_kwh.items() if k in ["Negocia\u00e7\u00e3o", "Contrato"])
+
+    # Pipeline aberto por empresa — separar negociacao/contrato vs total
+    pipe_neg = {}
     pipe_neg_val = {}
-    pipe_total = {}  # Todo o pipeline aberto
+    pipe_total = {}
     pipe_total_val = {}
     if not df_pipe.empty:
-        # Nomes com acentos conforme SF
-        fases_negociacao = ["Negocia\u00e7\u00e3o", "Contrato", "Negociacao"]
+        fases_negociacao = ["Negocia\u00e7\u00e3o", "Contrato"]
         for _, r in df_pipe.iterrows():
             e = r.get("Empresa_Proprietaria__c","")
             qtd = int(r["total"])
@@ -140,11 +145,12 @@ try:
         pt = pipe_total.get(emp, 0)
         ptv = pipe_total_val.get(emp, 0)
 
-        # Volume vendido
+        # Volume vendido + pipeline
         if ie:
             kh = kwh_m.get((a,m),0); kh_a = kwh_m.get((a_a,m_a),0)
             vol = _fk(kh); vol_a = _fk(kh_a); vol_lab = "Energia"; v_vol = _var(kh, du_h, kh_a, du_ant)
-            neg_vol = _fk(pnv); pipe_vol = _fk(ptv)
+            # Pipeline Energy usa kWh real (OpportunityLineItem)
+            neg_vol = _fk(energy_pipe_kwh_neg); pipe_vol = _fk(energy_pipe_kwh_total)
         else:
             vol = _fv(gv); vol_a = _fv(gv_a); vol_lab = "Valor"; v_vol = _var(gv, du_h, gv_a, du_ant)
             neg_vol = _fv(pnv); pipe_vol = _fv(ptv)

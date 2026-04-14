@@ -336,15 +336,39 @@ def get_os_mensal_por_empresa() -> pd.DataFrame:
 
 @st.cache_data(ttl=CACHE_TTL_SECONDS)
 def get_pipeline_aberto_por_empresa() -> pd.DataFrame:
-    """Pipeline aberto por empresa e fase (todas as fases exceto Fechado)."""
+    """Pipeline aberto por empresa e fase (todas as fases exceto Fechado).
+    Exclui usuario Pos Venda GFlex do pipeline da Energy.
+    """
     soql = """
         SELECT Empresa_Proprietaria__c, StageName, COUNT(Id) total, SUM(Amount) valor
         FROM Opportunity
         WHERE StageName NOT IN ('Fechado Ganho', 'Fechado Perdido')
+        AND Owner.Name != 'Pos Venda GFlex'
         GROUP BY Empresa_Proprietaria__c, StageName
         ORDER BY Empresa_Proprietaria__c
     """
     return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_energy_pipeline_kwh() -> dict:
+    """kWh do pipeline da Energy por fase (via OpportunityLineItem).
+    Exclui pos-venda.
+    """
+    soql = """
+        SELECT Opportunity.StageName fase, SUM(Quantity) total_kwh
+        FROM OpportunityLineItem
+        WHERE Opportunity.Empresa_Proprietaria__c = 'Flex Energy'
+        AND Opportunity.StageName NOT IN ('Fechado Ganho', 'Fechado Perdido')
+        AND Opportunity.Owner.Name != 'Pos Venda GFlex'
+        GROUP BY Opportunity.StageName
+    """
+    df = _query_to_df(soql)
+    result = {}
+    if not df.empty:
+        for _, r in df.iterrows():
+            result[r["fase"]] = float(r["total_kwh"]) if r["total_kwh"] else 0
+    return result
 
 
 # ============================================================

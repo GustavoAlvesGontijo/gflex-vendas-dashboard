@@ -13,6 +13,7 @@ from config import (
 from salesforce_client import (
     get_opps_mensal_por_empresa, get_opps_ganhas_mensal_por_empresa,
     get_energy_kwh_mensal, get_pipeline_aberto_por_empresa,
+    get_energy_pipeline_kwh,
 )
 
 def _fmt(v): return f"{int(v):,}".replace(",",".") if v else "0"
@@ -62,6 +63,7 @@ try:
     df_ganhas = get_opps_ganhas_mensal_por_empresa()
     df_kwh = get_energy_kwh_mensal()
     df_pipe = get_pipeline_aberto_por_empresa()
+    energy_pipe_kwh = get_energy_pipeline_kwh()
 
     opps_q = _bd(df_opps); opps_v = _bd(df_opps, "valor")
     ganhas_q = _bd(df_ganhas); ganhas_v = _bd(df_ganhas, "valor")
@@ -143,13 +145,20 @@ try:
                     total_pipe = int(df_e["total"].sum())
                     for _, r in df_e.iterrows():
                         fase = r["StageName"]; qtd = int(r["total"])
-                        val = r["valor"] if r["valor"] else 0
+                        # Energy: usar kWh real do OpportunityLineItem
+                        if ie:
+                            val = energy_pipe_kwh.get(fase, 0)
+                        else:
+                            val = r["valor"] if r["valor"] else 0
                         vf = _fk(val) if ie else _fv(val)
                         pct = (qtd/total_pipe*100) if total_pipe > 0 else 0
                         bar_w = min(pct, 100)
                         rows += f'<div style="display:flex;align-items:center;padding:4px 8px;border-bottom:1px solid #f5f5f5"><div style="flex:2;font-size:0.8rem">{fase}</div><div style="flex:1;text-align:right;font-weight:600">{_fmt(qtd)}</div><div style="flex:1;text-align:right;color:#666;font-size:0.8rem">{vf}</div><div style="flex:2;padding-left:8px"><div style="background:#e8e8e8;border-radius:4px;height:12px"><div style="background:{cor};border-radius:4px;height:12px;width:{bar_w:.0f}%"></div></div></div></div>'
 
-                    total_val = df_e["valor"].sum()
+                    if ie:
+                        total_val = sum(energy_pipe_kwh.values())
+                    else:
+                        total_val = df_e["valor"].sum()
                     tvf = _fk(total_val) if ie else _fv(total_val)
                     hdr = f'<div style="display:flex;padding:4px 8px;border-bottom:2px solid #ddd"><div style="flex:2;font-size:0.6rem;color:#999;text-transform:uppercase">Fase</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">Qtd</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">{unid}</div><div style="flex:2;font-size:0.6rem;color:#999;text-transform:uppercase;padding-left:8px">Distribuicao</div></div>'
 
