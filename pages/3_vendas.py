@@ -4,6 +4,8 @@ Historico mensal por empresa com grafico de linhas (2 eixos: qtd + volume).
 Filtro de Ano Fiscal. Energy em kWh, demais em R$.
 """
 import streamlit as st
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import date
