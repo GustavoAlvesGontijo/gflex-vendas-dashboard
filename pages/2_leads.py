@@ -1,10 +1,9 @@
 """
 Pagina 2 — Leads
-Organizado em secoes: mes vigente, evolucao mensal, detalhamento.
-Cada empresa comparada consigo mesma. Dias uteis para variacao.
+%F1 (criado e convertido no mes), funil por empresa, origens por empresa,
+motivos de descarte so do mes, top origens do mes. Sem temperatura.
 """
 import streamlit as st
-import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from datetime import date
@@ -13,124 +12,118 @@ from config import (
     dias_uteis_no_mes, dias_uteis_ate_hoje, MESES_PT,
 )
 from salesforce_client import (
-    get_leads_por_status, get_leads_por_origem, get_leads_por_rating,
+    get_leads_por_status, get_leads_por_origem,
     get_leads_motivo_descarte, get_leads_por_proprietario,
     get_leads_mensal_por_empresa, get_contas_mensal_por_empresa,
     get_leads_convertidos_no_mes_por_empresa,
+    get_leads_origem_mensal_por_empresa,
 )
 
-def _fmt(v): return f"{int(v):,}".replace(",", ".") if v else "0"
-
-def _var_html(atual, du_a, anterior, du_b):
-    if du_a == 0 or du_b == 0 or anterior == 0: return ""
+def _fmt(v): return f"{int(v):,}".replace(",",".") if v else "0"
+def _var(atual, du_a, anterior, du_b):
+    if du_a==0 or du_b==0 or anterior==0: return ""
     pct = ((atual/du_a - anterior/du_b) / (anterior/du_b)) * 100
-    if pct > 5: return f'<span style="color:#2E7D32;font-weight:600;font-size:0.8rem">+{pct:.0f}%</span>'
-    elif pct < -5: return f'<span style="color:#C62828;font-weight:600;font-size:0.8rem">{pct:.0f}%</span>'
-    return f'<span style="color:#888;font-size:0.8rem">{pct:+.0f}%</span>'
-
-def _build(df, val="total", filt_col=None, filt_val=None):
+    if pct > 5: return f'<span style="color:#2E7D32;font-weight:600;font-size:0.75rem">+{pct:.0f}%</span>'
+    elif pct < -5: return f'<span style="color:#C62828;font-weight:600;font-size:0.75rem">{pct:.0f}%</span>'
+    return f'<span style="color:#888;font-size:0.75rem">{pct:+.0f}%</span>'
+def _bd(df, val="total", fc=None, fv=None):
     d = {}
     if df.empty: return d
     for _, r in df.iterrows():
-        if filt_col and r.get(filt_col) != filt_val: continue
+        if fc and r.get(fc) != fv: continue
         k = (r.get("Empresa_Proprietaria__c",""), int(r["ano"]), int(r["mes"]))
-        d[k] = d.get(k, 0) + (float(r[val]) if r[val] is not None and not pd.isna(r[val]) else 0)
+        d[k] = d.get(k,0) + (float(r[val]) if r[val] is not None and not pd.isna(r[val]) else 0)
     return d
+def _g(d, e, a, m): return d.get((e,a,m), 0)
 
-# --- Header ---
 st.markdown("""
 <div style="background:#1a1a2e;padding:16px 24px;border-radius:12px;margin-bottom:20px">
 <h1 style="color:white;margin:0;font-size:1.5rem">Leads</h1>
-<p style="color:#EC8500;margin:2px 0 0 0;font-size:0.85rem">Geracao, conversao e qualidade — mes a mes por empresa</p>
+<p style="color:#EC8500;margin:2px 0 0 0;font-size:0.85rem">Geracao, conversao, %F1, origens e motivos — por empresa</p>
 </div>
 """, unsafe_allow_html=True)
 
-empresa = st.session_state.get("empresa_filtro", "Todas")
 hoje = date.today()
 m, a = hoje.month, hoje.year
-m_ant, a_ant = (m-1, a) if m > 1 else (12, a-1)
-du_atual = dias_uteis_ate_hoje(a, m)
-du_total = dias_uteis_no_mes(a, m)
-du_ant = dias_uteis_no_mes(a_ant, m_ant)
-nome_ant = MESES_PT[m_ant]
+m_a, a_a = (m-1, a) if m > 1 else (12, a-1)
+du_h = dias_uteis_ate_hoje(a, m)
+du_t = dias_uteis_no_mes(a, m)
+du_ant = dias_uteis_no_mes(a_a, m_a)
+n_ant = MESES_PT[m_a]
+empresa = st.session_state.get("empresa_filtro", "Todas")
 
 try:
     df_leads = get_leads_mensal_por_empresa()
     df_contas = get_contas_mensal_por_empresa()
-    df_conv_mes = get_leads_convertidos_no_mes_por_empresa()
+    df_conv = get_leads_convertidos_no_mes_por_empresa()
+    df_origens = get_leads_origem_mensal_por_empresa()
 
-    leads_total = _build(df_leads)
-    leads_criados_e_conv = _build(df_leads, filt_col="IsConverted", filt_val=True)  # criados no mes E convertidos
-    contas_d = _build(df_contas)
-
-    # Conversoes do mes (ConvertedDate) — leads convertidos naquele mes, independente de quando criados
-    conv_no_mes = _build(df_conv_mes)
-
-    def _g(d, emp, ano, mes): return d.get((emp, ano, mes), 0)
+    leads_t = _bd(df_leads)
+    leads_cc = _bd(df_leads, fc="IsConverted", fv=True)  # criados E convertidos no mes
+    conv_m = _bd(df_conv)  # convertidos no mes (qualquer criacao)
+    contas_d = _bd(df_contas)
 
     # ========================================
-    # SECAO 1: MES VIGENTE — cada empresa
+    # SECAO 1: MES VIGENTE por empresa com %F1
     # ========================================
     st.markdown(f"### Mes Vigente — {MESES_PT[m]}/{a}")
-    st.caption(f"{du_atual} de {du_total} dias uteis | vs {nome_ant} ({du_ant} DU) | variacao normalizada por dia util")
+    st.caption(f"{du_h} de {du_t} DU | %F1 = criados E convertidos no mesmo mes")
 
-    empresas_exibir = [empresa] if empresa != "Todas" else EMPRESAS
-    if empresa != "Todas" and empresa not in EMPRESAS:
-        empresas_exibir = EMPRESAS
+    empresas_ex = [empresa] if empresa != "Todas" and empresa in EMPRESAS else EMPRESAS
 
-    for emp in empresas_exibir:
+    for emp in empresas_ex:
         cor = CORES.get(emp, {}).get("primaria", "#1a1a2e")
         label = EMPRESA_LABELS.get(emp, emp)
 
-        l = _g(leads_total, emp, a, m)
-        l_ant = _g(leads_total, emp, a_ant, m_ant)
-        # Criados no mes E convertidos (mesmo mes)
-        cc = _g(leads_criados_e_conv, emp, a, m)
-        cc_ant = _g(leads_criados_e_conv, emp, a_ant, m_ant)
-        # Conversoes gerais do mes (qualquer lead convertido nesse mes)
-        cm = _g(conv_no_mes, emp, a, m)
-        cm_ant = _g(conv_no_mes, emp, a_ant, m_ant)
-        ct = _g(contas_d, emp, a, m)
-        ct_ant = _g(contas_d, emp, a_ant, m_ant)
+        l = _g(leads_t, emp, a, m); l_a = _g(leads_t, emp, a_a, m_a)
+        cm = _g(conv_m, emp, a, m); cm_a = _g(conv_m, emp, a_a, m_a)
+        cc = _g(leads_cc, emp, a, m); cc_a = _g(leads_cc, emp, a_a, m_a)
+        ct = _g(contas_d, emp, a, m); ct_a = _g(contas_d, emp, a_a, m_a)
+        f1 = (cc/l*100) if l > 0 else 0
+        f1_a = (cc_a/l_a*100) if l_a > 0 else 0
 
-        proj_l = int(l / du_atual * du_total) if du_atual > 0 else 0
-        proj_cm = int(cm / du_atual * du_total) if du_atual > 0 else 0
+        v_l = _var(l, du_h, l_a, du_ant)
+        v_cm = _var(cm, du_h, cm_a, du_ant)
+        v_ct = _var(ct, du_h, ct_a, du_ant)
 
-        v_l = _var_html(l, du_atual, l_ant, du_ant)
-        v_cm = _var_html(cm, du_atual, cm_ant, du_ant)
-        v_cc = _var_html(cc, du_atual, cc_ant, du_ant)
-        v_ct = _var_html(ct, du_atual, ct_ant, du_ant)
+        # F1 variacao (diferenca de pontos percentuais)
+        f1_delta = f1 - f1_a
+        if abs(f1_delta) > 1:
+            f1_var = f'<span style="color:{"#2E7D32" if f1_delta > 0 else "#C62828"};font-weight:600;font-size:0.75rem">{f1_delta:+.1f}pp</span>'
+        else:
+            f1_var = ""
 
         st.markdown(f"""
-<div style="background:white;border-radius:12px;padding:16px 20px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-left:5px solid {cor}">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+<div style="background:white;border-radius:12px;padding:14px 18px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-left:5px solid {cor}">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
 <span style="font-weight:700;color:{cor};font-size:1rem">{label}</span>
-<span style="font-size:0.7rem;color:#999">vs {nome_ant} (por DU)</span>
+<span style="font-size:0.7rem;color:#999">vs {n_ant} (por DU)</span>
 </div>
 <div style="display:flex;gap:0;flex-wrap:wrap">
-<div style="flex:1;min-width:100px;text-align:center;padding:6px 8px;border-right:1px solid #f0f0f0">
+<div style="flex:1;min-width:95px;text-align:center;padding:5px 8px;border-right:1px solid #f0f0f0">
 <div style="font-size:1.3rem;font-weight:700;color:#1a1a2e">{_fmt(l)}</div>
-<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">Leads Gerados</div>
+<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">Leads</div>
 <div>{v_l}</div>
 </div>
-<div style="flex:1;min-width:100px;text-align:center;padding:6px 8px;border-right:1px solid #f0f0f0">
+<div style="flex:1;min-width:95px;text-align:center;padding:5px 8px;border-right:1px solid #f0f0f0">
 <div style="font-size:1.3rem;font-weight:700;color:#2E7D32">{_fmt(cm)}</div>
-<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">Conversoes no Mes</div>
+<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">Conv. no Mes</div>
 <div>{v_cm}</div>
 </div>
-<div style="flex:1;min-width:100px;text-align:center;padding:6px 8px;border-right:1px solid #f0f0f0">
-<div style="font-size:1.3rem;font-weight:700;color:#1565C0">{_fmt(cc)}</div>
-<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">Criados+Conv no Mes</div>
-<div>{v_cc}</div>
+<div style="flex:1;min-width:95px;text-align:center;padding:5px 8px;border-right:1px solid #f0f0f0;background:#E8F5E9;border-radius:6px">
+<div style="font-size:1.3rem;font-weight:700;color:#1B5E20">{f1:.1f}%</div>
+<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">%F1</div>
+<div>{f1_var}</div>
 </div>
-<div style="flex:1;min-width:100px;text-align:center;padding:6px 8px">
+<div style="flex:1;min-width:95px;text-align:center;padding:5px 8px;border-right:1px solid #f0f0f0">
+<div style="font-size:1.3rem;font-weight:700;color:#1565C0">{_fmt(cc)}</div>
+<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">Criados+Conv</div>
+</div>
+<div style="flex:1;min-width:95px;text-align:center;padding:5px 8px">
 <div style="font-size:1.3rem;font-weight:700;color:#555">{_fmt(ct)}</div>
-<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">Contas Criadas</div>
+<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">Contas</div>
 <div>{v_ct}</div>
 </div>
-</div>
-<div style="font-size:0.7rem;color:#999;margin-top:6px;padding-top:6px;border-top:1px solid #f5f5f5">
-Projecao: {_fmt(proj_l)} leads · {_fmt(proj_cm)} conversoes &nbsp;|&nbsp; {nome_ant}: {_fmt(l_ant)} leads · {_fmt(cm_ant)} conversoes
 </div>
 </div>
 """, unsafe_allow_html=True)
@@ -138,106 +131,111 @@ Projecao: {_fmt(proj_l)} leads · {_fmt(proj_cm)} conversoes &nbsp;|&nbsp; {nome
     st.markdown("---")
 
     # ========================================
-    # SECAO 2: EVOLUCAO MES A MES
+    # SECAO 2: TOP ORIGENS DO MES por empresa
+    # ========================================
+    st.markdown(f"### Top Origens de Leads — {MESES_PT[m]}/{a}")
+
+    if not df_origens.empty:
+        df_or = df_origens.copy()
+        df_or = df_or[(df_or["ano"]==a) & (df_or["mes"]==m)]
+        df_or = df_or[df_or["LeadSource"].notna()]
+
+        # Dados mes anterior
+        df_or_a = df_origens.copy()
+        df_or_a = df_or_a[(df_or_a["ano"]==a_a) & (df_or_a["mes"]==m_a)]
+
+        for emp in empresas_ex:
+            cor = CORES.get(emp,{}).get("primaria","#1a1a2e")
+            label = EMPRESA_LABELS.get(emp,emp)
+            df_e = df_or[df_or["Empresa_Proprietaria__c"]==emp].sort_values("total", ascending=False).head(6)
+            if df_e.empty: continue
+
+            ant_d = dict(zip(
+                df_or_a[df_or_a["Empresa_Proprietaria__c"]==emp]["LeadSource"],
+                df_or_a[df_or_a["Empresa_Proprietaria__c"]==emp]["total"]
+            ))
+
+            items = ""
+            for _, r in df_e.iterrows():
+                orig = r["LeadSource"]; qtd = int(r["total"]); qtd_a = ant_d.get(orig,0)
+                pct = (qtd/df_e["total"].sum()*100) if df_e["total"].sum()>0 else 0
+                vh = _var(qtd, du_h, qtd_a, du_ant)
+                items += f'<div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid #f8f8f8"><div style="flex:2;font-size:0.8rem">{orig}</div><div style="flex:1;text-align:right;font-weight:600">{_fmt(qtd)}</div><div style="flex:1;text-align:right;color:#888;font-size:0.8rem">{pct:.0f}%</div><div style="flex:1;text-align:right">{vh}</div></div>'
+
+            hdr = f'<div style="display:flex;padding:2px 0;border-bottom:2px solid #eee;margin-bottom:2px"><div style="flex:2;font-size:0.6rem;color:#999;text-transform:uppercase">Origem</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">Qtd</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">%</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">vs {n_ant}</div></div>'
+            st.markdown(f'<div style="background:white;border-radius:10px;padding:14px 20px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-top:3px solid {cor}"><div style="font-weight:700;color:{cor};margin-bottom:8px;font-size:0.95rem">{label}</div>{hdr}{items}</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ========================================
+    # SECAO 3: EVOLUCAO MES A MES por empresa
     # ========================================
     st.markdown("### Evolucao Mes a Mes")
 
-    meses = []
+    meses_ex = []
     mx, ax = m, a
     for _ in range(6):
-        meses.append((ax, mx))
+        meses_ex.append((ax, mx))
         mx -= 1
         if mx == 0: mx, ax = 12, ax-1
-    meses.reverse()
+    meses_ex.reverse()
 
-    tabela = []
-    for (ano, mes) in meses:
-        du = dias_uteis_no_mes(ano, mes)
-        if empresa == "Todas":
-            tl = sum(_g(leads_total, e, ano, mes) for e in EMPRESAS)
-            t_cm = sum(_g(conv_no_mes, e, ano, mes) for e in EMPRESAS)
-            t_cc = sum(_g(leads_criados_e_conv, e, ano, mes) for e in EMPRESAS)
-            tt = sum(_g(contas_d, e, ano, mes) for e in EMPRESAS)
-        else:
-            tl = _g(leads_total, empresa, ano, mes)
-            t_cm = _g(conv_no_mes, empresa, ano, mes)
-            t_cc = _g(leads_criados_e_conv, empresa, ano, mes)
-            tt = _g(contas_d, empresa, ano, mes)
-        tabela.append({
-            "Mes": f"{MESES_PT[mes]}/{ano}", "DU": du,
-            "Leads": int(tl),
-            "Conv. no Mes": int(t_cm),
-            "Criados+Conv": int(t_cc),
-            "Contas": int(tt),
-            "Leads/DU": f"{tl/du:.0f}" if du > 0 else "\u2014",
-        })
-    st.dataframe(pd.DataFrame(tabela), width="stretch", hide_index=True)
+    for emp in empresas_ex:
+        cor = CORES.get(emp,{}).get("primaria","#1a1a2e")
+        label = EMPRESA_LABELS.get(emp,emp)
+        tab = []
+        for (ano, mes) in meses_ex:
+            du = dias_uteis_no_mes(ano, mes)
+            lq = _g(leads_t, emp, ano, mes)
+            cm = _g(conv_m, emp, ano, mes)
+            cc = _g(leads_cc, emp, ano, mes)
+            f1 = (cc/lq*100) if lq > 0 else 0
+            ct = _g(contas_d, emp, ano, mes)
+            tab.append({"Mes": f"{MESES_PT[mes]}/{ano}", "DU": du, "Leads": int(lq), "Conv": int(cm), "%F1": f"{f1:.1f}%", "Criados+Conv": int(cc), "Contas": int(ct)})
+        st.markdown(f'<div style="border-left:4px solid {cor};padding-left:10px;margin:8px 0 4px 0;font-weight:600;color:{cor}">{label}</div>', unsafe_allow_html=True)
+        st.dataframe(pd.DataFrame(tab), width="stretch", hide_index=True)
 
     st.markdown("---")
 
     # ========================================
-    # SECAO 3: DETALHAMENTO (filtro por periodo global)
+    # SECAO 4: FUNIL DE STATUS — POR EMPRESA (so do mes)
     # ========================================
-    st.markdown("### Detalhamento do Periodo")
-    data_inicio = st.session_state.get("data_inicio")
-    data_fim = st.session_state.get("data_fim")
+    st.markdown(f"### Funil de Status — {MESES_PT[m]}/{a}")
+    st.caption("Apenas leads do mes vigente, por empresa")
 
-    col_l, col_r = st.columns(2)
+    d_ini = date(a, m, 1)
 
-    with col_l:
-        st.markdown("#### Funil de Status")
-        df_st = get_leads_por_status(empresa, data_inicio, data_fim)
-        if not df_st.empty:
-            ordem = ["Aberto","Em Contato","Em Interacao","Transferencia Vendedor","Objecao Comercial","Aceite","Recuperacao","Stand-by Retrabalho","Fechado Convertido","Fechado Nao Convertido"]
-            df_st["ord"] = df_st["Status"].map({s:i for i,s in enumerate(ordem)}).fillna(99)
-            df_st = df_st.sort_values("ord")
-            fig = px.bar(df_st, x="total", y="Status", orientation="h", text="total", color_discrete_sequence=["#1a1a2e"])
-            fig.update_layout(yaxis_title="", xaxis_title="", height=400, showlegend=False, margin=dict(l=0,r=40,t=10,b=10))
-            fig.update_traces(textposition="outside")
-            fig.update_yaxes(autorange="reversed")
-            st.plotly_chart(fig, use_container_width=True)
-
-    with col_r:
-        st.markdown("#### Origens de Leads")
-        df_or = get_leads_por_origem(empresa, data_inicio, data_fim)
-        if not df_or.empty:
-            df_or = df_or[df_or["LeadSource"].notna()].head(8)
-            fig2 = px.bar(df_or, x="total", y="LeadSource", orientation="h", text="total", color_discrete_sequence=["#EC8500"])
-            fig2.update_layout(yaxis_title="", xaxis_title="", height=400, showlegend=False, margin=dict(l=0,r=40,t=10,b=10))
-            fig2.update_traces(textposition="outside")
-            st.plotly_chart(fig2, use_container_width=True)
-
-    col_l2, col_r2 = st.columns(2)
-
-    with col_l2:
-        st.markdown("#### Temperatura")
-        df_rat = get_leads_por_rating(empresa, data_inicio, data_fim)
-        if not df_rat.empty:
-            df_rat = df_rat[df_rat["Rating"].notna()]
-            cores_t = {"Congelado":"#4FC3F7","Frio":"#29B6F6","Morno":"#FFA726","Quente":"#EF5350","Muito Quente":"#C62828"}
-            fig3 = px.pie(df_rat, names="Rating", values="total", color="Rating", color_discrete_map=cores_t)
-            fig3.update_traces(textposition="inside", textinfo="percent+label+value")
-            fig3.update_layout(height=350, margin=dict(t=10,b=10))
-            st.plotly_chart(fig3, use_container_width=True)
-
-    with col_r2:
-        st.markdown("#### Motivos de Descarte")
-        df_desc = get_leads_motivo_descarte(empresa, data_inicio, data_fim)
-        if not df_desc.empty:
-            df_d = df_desc.head(8).sort_values("total", ascending=True)
-            fig4 = px.bar(df_d, x="total", y="Motivo_do_Descarte__c", orientation="h", text="total", color_discrete_sequence=["#C62828"])
-            fig4.update_layout(yaxis_title="", xaxis_title="", height=350, showlegend=False, margin=dict(l=0,r=40,t=10,b=10))
-            fig4.update_traces(textposition="outside")
-            st.plotly_chart(fig4, use_container_width=True)
+    for emp in empresas_ex:
+        cor = CORES.get(emp,{}).get("primaria","#1a1a2e")
+        label = EMPRESA_LABELS.get(emp,emp)
+        df_st = get_leads_por_status(emp, d_ini, hoje)
+        if df_st.empty: continue
+        ordem = ["Aberto","Em Contato","Em Interacao","Transferencia Vendedor","Objecao Comercial","Aceite","Recuperacao","Fechado Convertido","Fechado Nao Convertido"]
+        df_st["ord"] = df_st["Status"].map({s:i for i,s in enumerate(ordem)}).fillna(99)
+        df_st = df_st.sort_values("ord")
+        fig = px.bar(df_st, x="total", y="Status", orientation="h", text="total", color_discrete_sequence=[cor])
+        fig.update_layout(yaxis_title="", xaxis_title="", height=300, showlegend=False, margin=dict(l=0,r=40,t=10,b=10), title=label)
+        fig.update_traces(textposition="outside")
+        fig.update_yaxes(autorange="reversed")
+        st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
-    st.markdown("#### Leads por Proprietario (Top 20)")
-    df_prop = get_leads_por_proprietario(empresa, data_inicio, data_fim)
-    if not df_prop.empty:
-        pivot = df_prop.pivot_table(index="Owner.Name", columns="Status", values="total", fill_value=0, aggfunc="sum").reset_index()
-        pivot["Total"] = pivot.select_dtypes(include="number").sum(axis=1)
-        pivot = pivot.sort_values("Total", ascending=False).head(20)
-        st.dataframe(pivot, width="stretch", hide_index=True)
+
+    # ========================================
+    # SECAO 5: MOTIVOS DE DESCARTE — SO DO MES
+    # ========================================
+    st.markdown(f"### Motivos de Descarte — {MESES_PT[m]}/{a}")
+
+    for emp in empresas_ex:
+        cor = CORES.get(emp,{}).get("primaria","#1a1a2e")
+        label = EMPRESA_LABELS.get(emp,emp)
+        df_desc = get_leads_motivo_descarte(emp, d_ini, hoje)
+        if df_desc.empty: continue
+        df_d = df_desc.head(8).sort_values("total", ascending=True)
+        fig = px.bar(df_d, x="total", y="Motivo_do_Descarte__c", orientation="h", text="total", color_discrete_sequence=["#C62828"])
+        fig.update_layout(yaxis_title="", xaxis_title="", height=280, showlegend=False, margin=dict(l=0,r=40,t=10,b=10), title=label)
+        fig.update_traces(textposition="outside")
+        st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
     st.error(f"Erro: {e}")

@@ -175,18 +175,10 @@ try:
         if mx == 0: mx, ax = 12, ax-1
     meses.reverse()
 
-    if empresa == "Todas":
-        tabela = []
-        for (ano, mes) in meses:
-            du = dias_uteis_no_mes(ano, mes)
-            oq = sum(_g(opps_qtd, e, ano, mes) for e in EMPRESAS)
-            gq = sum(_g(ganhas_qtd, e, ano, mes) for e in EMPRESAS)
-            gv = sum(_g(ganhas_val, e, ano, mes) for e in EMPRESAS)
-            wr = (gq/oq*100) if oq > 0 else 0
-            tabela.append({"Mes": f"{MESES_PT[mes]}/{ano}", "DU": du, "Orcamentos": int(oq), "Vendas": int(gq), "Win%": f"{wr:.0f}%", "Valor Vendido": _fmt_valor(gv), "Opps/DU": f"{oq/du:.0f}" if du > 0 else "\u2014"})
-        st.dataframe(pd.DataFrame(tabela), width="stretch", hide_index=True)
-    else:
-        emp = empresa
+    empresas_ex = [empresa] if empresa != "Todas" and empresa in EMPRESAS else EMPRESAS
+    for emp in empresas_ex:
+        cor = CORES.get(emp, {}).get("primaria", "#1a1a2e")
+        label = EMPRESA_LABELS.get(emp, emp)
         is_energy = (emp == "Flex Energy")
         tabela = []
         for (ano, mes) in meses:
@@ -196,7 +188,8 @@ try:
             gv = _g(ganhas_val, emp, ano, mes)
             wr = (gq/oq*100) if oq > 0 else 0
             vol = _fmt_kwh(kwh_mes.get((ano, mes), 0)) if is_energy else _fmt_valor(gv)
-            tabela.append({"Mes": f"{MESES_PT[mes]}/{ano}", "DU": du, "Orcamentos": int(oq), "Vendas": int(gq), "Win%": f"{wr:.0f}%", "Volume": vol})
+            tabela.append({"Mes": f"{MESES_PT[mes]}/{ano}", "DU": du, "Orcs": int(oq), "Vendas": int(gq), "Win%": f"{wr:.0f}%", "Volume": vol})
+        st.markdown(f'<div style="border-left:4px solid {cor};padding-left:10px;margin:8px 0 4px 0;font-weight:600;color:{cor}">{label}</div>', unsafe_allow_html=True)
         st.dataframe(pd.DataFrame(tabela), width="stretch", hide_index=True)
 
     st.markdown("---")
