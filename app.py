@@ -1,11 +1,44 @@
 """
 Dashboard de Vendas GFlex — Pagina Inicial
-Redireciona para Visao Geral. Sidebar com filtros globais.
+Autenticacao + Sidebar com filtros globais.
 """
 import streamlit as st
 from config import EMPRESAS, EMPRESA_LABELS, CORES, get_periodo
 
 st.set_page_config(page_title="GFlex Vendas", page_icon="\U0001f4ca", layout="wide", initial_sidebar_state="expanded")
+
+# ========================================
+# AUTENTICACAO — acesso por senha
+# ========================================
+def check_password():
+    """Verifica se o usuario digitou a senha correta."""
+    try:
+        correct = st.secrets["app"]["password"]
+    except Exception:
+        correct = "gflex2026"  # fallback local
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+    if st.session_state.authenticated:
+        return True
+    st.markdown("""
+<div style="max-width:400px;margin:80px auto;text-align:center">
+<div style="background:#1a1a2e;padding:24px;border-radius:14px;margin-bottom:24px">
+<h1 style="color:white;margin:0;font-size:1.6rem">\U0001f4ca GFlex Vendas</h1>
+<p style="color:#EC8500;margin:6px 0 0 0;font-size:0.85rem">Painel de Vendas — Acesso Restrito</p>
+</div>
+</div>
+""", unsafe_allow_html=True)
+    pwd = st.text_input("Senha de acesso", type="password", key="pwd_input")
+    if pwd:
+        if pwd == correct:
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("Senha incorreta")
+    return False
+
+if not check_password():
+    st.stop()
 
 # CSS premium executivo
 st.markdown("""

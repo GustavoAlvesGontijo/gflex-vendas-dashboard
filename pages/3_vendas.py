@@ -6,6 +6,10 @@ Filtro de Ano Fiscal. Energy em kWh, demais em R$.
 import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Auth check
+if not st.session_state.get("authenticated", False):
+    st.warning("Acesse pela pagina principal para fazer login.")
+    st.stop()
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import date

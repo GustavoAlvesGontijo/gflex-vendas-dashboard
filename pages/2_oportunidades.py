@@ -6,6 +6,10 @@ Evolucao mes a mes por empresa. Sem detalhamento de periodo nem engajamento.
 import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Auth check
+if not st.session_state.get("authenticated", False):
+    st.warning("Acesse pela pagina principal para fazer login.")
+    st.stop()
 import pandas as pd
 from datetime import date
 from config import (
