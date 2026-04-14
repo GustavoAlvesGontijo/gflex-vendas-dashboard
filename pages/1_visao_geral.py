@@ -119,7 +119,7 @@ try:
         for _, r in df_pipe.iterrows():
             e = r.get("Empresa_Proprietaria__c","")
             qtd = int(r["total"])
-            val = float(r["valor"]) if r["valor"] else 0
+            val = float(r["valor"]) if (r["valor"] is not None and not pd.isna(r["valor"])) else 0
             pipe_total[e] = pipe_total.get(e,0) + qtd
             pipe_total_val[e] = pipe_total_val.get(e,0) + val
             if r["StageName"] in fases_negociacao:

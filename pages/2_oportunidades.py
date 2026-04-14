@@ -155,7 +155,7 @@ try:
                         if ie:
                             val = energy_pipe_kwh.get(fase, 0)
                         else:
-                            val = r["valor"] if r["valor"] else 0
+                            val = float(r["valor"]) if (r["valor"] is not None and not pd.isna(r["valor"])) else 0
                         vf = _fk(val) if ie else _fv(val)
                         pct = (qtd/total_pipe*100) if total_pipe > 0 else 0
                         bar_w = min(pct, 100)
