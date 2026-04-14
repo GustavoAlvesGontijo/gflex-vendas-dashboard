@@ -99,46 +99,38 @@ try:
         # Grafico de linhas com 2 eixos
         fig = go.Figure()
 
-        # Eixo 1: Quantidade de vendas (barras)
-        fig.add_trace(go.Bar(
-            x=meses_label, y=vendas_qtd, name="Vendas",
-            marker_color=cor, opacity=0.3,
-            text=[_fmt(v) for v in vendas_qtd], textposition="outside",
-            yaxis="y",
-        ))
-
-        # Eixo 1: Linha de vendas
+        # Linha 1: Quantidade de vendas (eixo esquerdo)
         fig.add_trace(go.Scatter(
             x=meses_label, y=vendas_qtd, name="Vendas (qtd)",
             mode="lines+markers+text",
             line=dict(color=cor, width=3),
-            marker=dict(size=8, color=cor),
-            text=[_fmt(v) for v in vendas_qtd], textposition="top center",
-            textfont=dict(size=10, color=cor),
+            marker=dict(size=10, color=cor, symbol="circle"),
+            text=[str(v) for v in vendas_qtd], textposition="top center",
+            textfont=dict(size=11, color=cor, family="Arial Black"),
             yaxis="y",
         ))
 
-        # Eixo 2: Volume (valor ou kWh)
+        # Linha 2: Volume — valor ou kWh (eixo direito)
         fig.add_trace(go.Scatter(
             x=meses_label, y=vendas_vol, name=f"Volume ({unid})",
             mode="lines+markers+text",
-            line=dict(color="#2E7D32", width=2, dash="dot"),
-            marker=dict(size=6, color="#2E7D32"),
+            line=dict(color="#2E7D32", width=2, dash="dash"),
+            marker=dict(size=8, color="#2E7D32", symbol="diamond"),
             text=[_fk(v) if ie else _fv(v) for v in vendas_vol], textposition="bottom center",
-            textfont=dict(size=9, color="#2E7D32"),
+            textfont=dict(size=10, color="#2E7D32"),
             yaxis="y2",
         ))
 
         fig.update_layout(
-            height=320,
-            margin=dict(t=30, b=30, l=50, r=50),
+            height=340,
+            margin=dict(t=20, b=40, l=50, r=60),
             showlegend=True,
-            legend=dict(orientation="h", y=-0.15, x=0.5, xanchor="center"),
-            yaxis=dict(title="Vendas (qtd)", side="left", showgrid=False),
-            yaxis2=dict(title=f"Volume ({unid})", side="right", overlaying="y", showgrid=False),
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            bargap=0.5,
+            legend=dict(orientation="h", y=-0.12, x=0.5, xanchor="center", font=dict(size=11)),
+            yaxis=dict(title="Vendas (qtd)", side="left", showgrid=True, gridcolor="#f0f0f0", zeroline=False),
+            yaxis2=dict(title=f"Volume ({unid})", side="right", overlaying="y", showgrid=False, zeroline=False),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            font=dict(family="Inter, Arial, sans-serif"),
         )
         st.plotly_chart(fig, use_container_width=True)
 

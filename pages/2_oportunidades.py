@@ -75,7 +75,7 @@ try:
     # ========================================
     # SECAO 1: CARD + PIPELINE por empresa
     # ========================================
-    st.markdown(f"### {MESES_PT[m]}/{a} — Orcamentos, Vendas e Pipeline", anchor="cards")
+    st.markdown(f"### {MESES_PT[m]}/{a} — Orcamentos, Vendas e Pipeline")
     st.caption(f"Comparacao com {n_ant} normalizada por dias uteis")
 
     for emp in empresas_ex:
@@ -165,7 +165,7 @@ try:
     # ========================================
     # SECAO 2: EVOLUCAO MES A MES por empresa
     # ========================================
-    st.markdown("### Evolucao Mes a Mes", anchor="evolucao")
+    st.markdown("### Evolucao Mes a Mes")
 
     meses = []
     mx, ax = m, a

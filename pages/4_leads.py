@@ -66,7 +66,7 @@ try:
     # ========================================
     # SUBSECAO 1: CARDS DO MES com %F1
     # ========================================
-    st.markdown(f"### Mes Vigente — {MESES_PT[m]}/{a}", anchor="mes")
+    st.markdown(f"### Mes Vigente — {MESES_PT[m]}/{a}")
     st.caption(f"{du_h} de {du_t} DU | %F1 = criados E convertidos no mesmo mes")
 
     for emp in empresas_ex:
@@ -124,7 +124,7 @@ try:
     # ========================================
     # SUBSECAO 2: ORIGENS DO MES por empresa
     # ========================================
-    st.markdown(f"### Origens de Leads — {MESES_PT[m]}/{a}", anchor="origens")
+    st.markdown(f"### Origens de Leads — {MESES_PT[m]}/{a}")
 
     if not df_origens.empty:
         df_or = df_origens[(df_origens["ano"]==a) & (df_origens["mes"]==m)]
@@ -153,7 +153,7 @@ try:
     # ========================================
     # SUBSECAO 3: FUNIL DE STATUS — tabela por empresa
     # ========================================
-    st.markdown(f"### Funil de Status — {MESES_PT[m]}/{a}", anchor="funil")
+    st.markdown(f"### Funil de Status — {MESES_PT[m]}/{a}")
     st.caption("Distribuicao de leads criados no mes por status atual")
 
     d_ini = date(a, m, 1)
@@ -197,7 +197,7 @@ try:
     # ========================================
     # SUBSECAO 4: EVOLUCAO MES A MES por empresa
     # ========================================
-    st.markdown("### Evolucao Mes a Mes", anchor="evolucao")
+    st.markdown("### Evolucao Mes a Mes")
 
     meses_ex = []
     mx, ax = m, a
