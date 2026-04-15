@@ -14,6 +14,8 @@ from config import (
 )
 
 
+import time as _time
+
 def _get_secret(key: str, fallback: str = "") -> str:
     """Busca credencial: primeiro st.secrets (Cloud), depois config.py (.env local)."""
     try:
@@ -22,9 +24,14 @@ def _get_secret(key: str, fallback: str = "") -> str:
         return fallback
 
 
-@st.cache_resource
-def get_sf_connection() -> Salesforce:
-    """Conexao singleton com o Salesforce via OAuth refresh token."""
+# Conexao SF com renovacao automatica de token
+_sf_connection = None
+_sf_token_time = 0
+_SF_TOKEN_TTL = 5400  # 90 minutos (token dura ~2h, renovamos antes)
+
+
+def _create_sf_connection() -> Salesforce:
+    """Cria nova conexao SF com token fresco."""
     client_id = _get_secret("SF_CLIENT_ID", SF_CLIENT_ID)
     client_secret = _get_secret("SF_CLIENT_SECRET", SF_CLIENT_SECRET)
     refresh_token = _get_secret("SF_REFRESH_TOKEN", SF_REFRESH_TOKEN)
@@ -53,10 +60,35 @@ def get_sf_connection() -> Salesforce:
     )
 
 
+def get_sf_connection() -> Salesforce:
+    """Retorna conexao SF, renovando o token se expirou."""
+    global _sf_connection, _sf_token_time
+    now = _time.time()
+    if _sf_connection is None or (now - _sf_token_time) > _SF_TOKEN_TTL:
+        _sf_connection = _create_sf_connection()
+        _sf_token_time = now
+    return _sf_connection
+
+
+def _reset_sf_connection():
+    """Forca renovacao do token na proxima chamada."""
+    global _sf_connection, _sf_token_time
+    _sf_connection = None
+    _sf_token_time = 0
+
+
 def _query_to_df(soql: str) -> pd.DataFrame:
-    """Executa SOQL e retorna DataFrame. Remove coluna 'attributes' do resultado."""
-    sf = get_sf_connection()
-    result = sf.query_all(soql)
+    """Executa SOQL e retorna DataFrame. Renova token se sessao expirou."""
+    try:
+        sf = get_sf_connection()
+        result = sf.query_all(soql)
+    except Exception as e:
+        if "INVALID_SESSION_ID" in str(e) or "Session expired" in str(e):
+            _reset_sf_connection()
+            sf = get_sf_connection()
+            result = sf.query_all(soql)
+        else:
+            raise
     records = result.get("records", [])
     if not records:
         return pd.DataFrame()
