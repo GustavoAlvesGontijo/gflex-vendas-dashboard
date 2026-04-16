@@ -112,6 +112,14 @@ try:
         v_oq = _var(oq, du_h, oq_a, du_ant)
         v_gq = _var(gq, du_h, gq_a, du_ant)
 
+        # Valores mes anterior formatados para rodape
+        if ie:
+            vol_vend_ant = _fk(kh_a)
+            vol_orc_ant = _fv(ov_a)
+        else:
+            vol_vend_ant = _fv(gv_a)
+            vol_orc_ant = _fv(ov_a)
+
         # Card com 4 blocos: Orçamentos | Vol Orçado | Vendas | Vol Vendido
         st.markdown(f"""
 <div style="background:white;border-radius:12px 12px 0 0;padding:18px 22px;margin-bottom:0;box-shadow:0 2px 6px rgba(0,0,0,0.06);border-left:5px solid {cor}">
@@ -142,7 +150,7 @@ try:
 </div>
 </div>
 <div style="font-size:0.7rem;color:#999;margin-top:6px;padding-top:6px;border-top:1px solid #f5f5f5">
-{n_ant}: {_fmt(oq_a)} orcs \u00b7 {_fmt(gq_a)} vendas \u00b7 {vol_a}
+{n_ant}: {_fmt(oq_a)} orcs \u00b7 {vol_orc_ant} orcado \u00b7 {_fmt(gq_a)} vendas \u00b7 {vol_vend_ant} vendido
 </div>
 </div>
 """, unsafe_allow_html=True)
