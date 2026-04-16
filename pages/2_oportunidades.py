@@ -20,8 +20,8 @@ from config import (
 )
 from salesforce_client import (
     get_opps_mensal_por_empresa, get_opps_ganhas_mensal_por_empresa,
-    get_energy_kwh_mensal, get_pipeline_aberto_por_empresa,
-    get_energy_pipeline_kwh,
+    get_energy_kwh_mensal, get_energy_kwh_orcado_mensal,
+    get_pipeline_aberto_por_empresa, get_energy_pipeline_kwh,
 )
 
 def _fmt(v): return f"{int(v):,}".replace(",",".") if v else "0"
@@ -70,6 +70,7 @@ try:
     df_opps = get_opps_mensal_por_empresa()
     df_ganhas = get_opps_ganhas_mensal_por_empresa()
     df_kwh = get_energy_kwh_mensal()
+    df_kwh_orc = get_energy_kwh_orcado_mensal()
     df_pipe = get_pipeline_aberto_por_empresa()
     energy_pipe_kwh = get_energy_pipeline_kwh()
 
@@ -79,6 +80,10 @@ try:
     if not df_kwh.empty:
         for _, r in df_kwh.iterrows():
             kwh_m[(int(r["ano"]),int(r["mes"]))] = float(r["total_kwh"]) if r["total_kwh"] else 0
+    kwh_orc_m = {}
+    if not df_kwh_orc.empty:
+        for _, r in df_kwh_orc.iterrows():
+            kwh_orc_m[(int(r["ano"]),int(r["mes"]))] = float(r["total_kwh"]) if r["total_kwh"] else 0
 
     empresas_ex = [empresa] if empresa != "Todas" and empresa in EMPRESAS else EMPRESAS
 
@@ -102,8 +107,9 @@ try:
             kh = kwh_m.get((a,m),0); kh_a = kwh_m.get((a_a,m_a),0)
             vol_vend = _fk(kh); vol_lab = "Energia"
             v_vol_vend = _var(kh, du_h, kh_a, du_ant); vol_cor = "#EC8500"
-            # Volume orcado = Amount das opps criadas (para Energy tambem e R$, pois nao tem kWh nas opps criadas)
-            vol_orc = _fv(ov); v_vol_orc = _var(ov, du_h, ov_a, du_ant)
+            # Volume orcado em kWh (via OpportunityLineItem)
+            kh_orc = kwh_orc_m.get((a,m),0); kh_orc_a = kwh_orc_m.get((a_a,m_a),0)
+            vol_orc = _fk(kh_orc); v_vol_orc = _var(kh_orc, du_h, kh_orc_a, du_ant)
         else:
             vol_vend = _fv(gv); vol_lab = "Valor"
             v_vol_vend = _var(gv, du_h, gv_a, du_ant); vol_cor = "#2E7D32"
@@ -115,7 +121,7 @@ try:
         # Valores mes anterior formatados para rodape
         if ie:
             vol_vend_ant = _fk(kh_a)
-            vol_orc_ant = _fv(ov_a)
+            vol_orc_ant = _fk(kh_orc_a)
         else:
             vol_vend_ant = _fv(gv_a)
             vol_orc_ant = _fv(ov_a)

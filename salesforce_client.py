@@ -333,6 +333,24 @@ def get_energy_kwh_mensal() -> pd.DataFrame:
 
 
 @st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_energy_kwh_orcado_mensal() -> pd.DataFrame:
+    """kWh orcado pela Flex Energy por mes (TODAS as opps criadas, nao so ganhas).
+    Usa CreatedDate da Opportunity (quando o orcamento foi feito).
+    """
+    soql = """
+        SELECT CALENDAR_MONTH(Opportunity.CreatedDate) mes,
+               CALENDAR_YEAR(Opportunity.CreatedDate) ano,
+               SUM(Quantity) total_kwh
+        FROM OpportunityLineItem
+        WHERE Opportunity.Empresa_Proprietaria__c = 'Flex Energy'
+        AND Opportunity.CreatedDate >= 2025-01-01T00:00:00Z
+        GROUP BY CALENDAR_MONTH(Opportunity.CreatedDate), CALENDAR_YEAR(Opportunity.CreatedDate)
+        ORDER BY CALENDAR_YEAR(Opportunity.CreatedDate), CALENDAR_MONTH(Opportunity.CreatedDate)
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
 def get_leads_origem_mensal_por_empresa() -> pd.DataFrame:
     """Leads por empresa+origem+mes."""
     soql = """
