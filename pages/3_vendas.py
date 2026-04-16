@@ -102,55 +102,60 @@ try:
 </div>
 """, unsafe_allow_html=True)
 
-        # Grafico de linhas com 2 eixos
+        # Grafico de barras agrupadas com 2 eixos
         fig = go.Figure()
 
         vol_label = "Energia (kWh)" if ie else "Valor Vendido (R$)"
 
-        # Linha 1: Vendas — DESTAQUE (mais grossa)
-        fig.add_trace(go.Scatter(
-            x=meses_label, y=vendas_qtd, name="Vendas",
-            mode="lines+markers+text",
-            line=dict(color="#2E7D32", width=4),
-            marker=dict(size=12, color="#2E7D32", symbol="circle", line=dict(width=2, color="white")),
-            text=[str(v) for v in vendas_qtd], textposition="top center",
-            textfont=dict(size=12, color="#2E7D32", family="Arial Black"),
+        # Barras 1: Volume vendido — DESTAQUE (barras grandes, cor da empresa)
+        fig.add_trace(go.Bar(
+            x=meses_label, y=vendas_vol, name=vol_label,
+            marker_color=cor, opacity=0.85,
+            text=[_fk(v) if ie else _fv(v) for v in vendas_vol],
+            textposition="outside",
+            textfont=dict(size=11, color=cor, family="Arial Black"),
             yaxis="y",
         ))
 
-        # Linha 2: Volume — secundaria
-        fig.add_trace(go.Scatter(
-            x=meses_label, y=vendas_vol, name=vol_label,
-            mode="lines+markers+text",
-            line=dict(color=cor, width=2, dash="dot"),
-            marker=dict(size=7, color=cor, symbol="diamond"),
-            text=[_fk(v) if ie else _fv(v) for v in vendas_vol], textposition="bottom center",
-            textfont=dict(size=9, color=cor),
+        # Barras 2: Quantidade de vendas (barras menores, verde)
+        fig.add_trace(go.Bar(
+            x=meses_label, y=vendas_qtd, name="Vendas (qtd)",
+            marker_color="#2E7D32", opacity=0.7,
+            text=[str(v) for v in vendas_qtd],
+            textposition="outside",
+            textfont=dict(size=10, color="#2E7D32"),
             yaxis="y2",
         ))
 
         fig.update_layout(
-            height=340,
-            margin=dict(t=20, b=40, l=50, r=60),
+            barmode="group",
+            height=360,
+            margin=dict(t=30, b=40, l=50, r=60),
             showlegend=True,
             legend=dict(orientation="h", y=-0.12, x=0.5, xanchor="center", font=dict(size=11)),
-            yaxis=dict(title="Vendas (qtd)", side="left", showgrid=True, gridcolor="#f0f0f0", zeroline=False),
-            yaxis2=dict(title=f"Volume ({unid})", side="right", overlaying="y", showgrid=False, zeroline=False),
+            yaxis=dict(title=vol_label, side="left", showgrid=True, gridcolor="#f0f0f0", zeroline=False),
+            yaxis2=dict(title="Vendas (qtd)", side="right", overlaying="y", showgrid=False, zeroline=False),
             plot_bgcolor="white",
             paper_bgcolor="white",
             font=dict(family="Inter, Arial, sans-serif"),
+            bargap=0.25,
+            bargroupgap=0.1,
         )
         st.plotly_chart(fig, use_container_width=True)
 
-        # Tabela compacta
-        col_vol = "Energia (kWh)" if ie else "Valor Vendido"
-        tab = []
+        # Tabela HTML atrativa
+        col_vol = "Energia" if ie else "Valor"
+        rows_html = ""
         for i, (ano, mes) in enumerate(meses_af):
             du = dias_uteis_no_mes(ano, mes)
             vol_fmt = _fk(vendas_vol[i]) if ie else _fv(vendas_vol[i])
             vdu = f"{vendas_qtd[i]/du:.1f}" if du > 0 else "\u2014"
-            tab.append({"Mes": MESES_PT[mes], "DU": du, "Vendas": vendas_qtd[i], "V/DU": vdu, col_vol: vol_fmt})
-        st.dataframe(pd.DataFrame(tab), width="stretch", hide_index=True)
+            bg = "#fff" if i % 2 == 0 else "#F8F9FA"
+            rows_html += f'<tr style="background:{bg}"><td style="font-weight:600;color:#1a1a2e">{MESES_PT[mes]}</td><td style="text-align:center;color:#888">{du}</td><td style="text-align:center;font-weight:700;color:#2E7D32;font-size:1.05rem">{vendas_qtd[i]}</td><td style="text-align:center;color:#888">{vdu}</td><td style="text-align:right;font-weight:700;color:{cor};font-size:1.05rem">{vol_fmt}</td></tr>'
+
+        hdr = f'<tr style="background:#1a1a2e"><th style="color:white;padding:10px 12px;font-size:0.8rem">Mes</th><th style="color:white;text-align:center;padding:10px 8px;font-size:0.8rem">DU</th><th style="color:white;text-align:center;padding:10px 8px;font-size:0.8rem">Vendas</th><th style="color:white;text-align:center;padding:10px 8px;font-size:0.75rem">Vendas/DU</th><th style="color:white;text-align:right;padding:10px 12px;font-size:0.8rem">{col_vol}</th></tr>'
+
+        st.markdown(f'<table style="width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-top:8px">{hdr}{rows_html}</table>', unsafe_allow_html=True)
         st.markdown("---")
 
 except Exception as e:

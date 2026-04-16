@@ -92,42 +92,51 @@ try:
         ie = (emp == "Flex Energy")
 
         oq = _g(opps_q, emp, a, m); oq_a = _g(opps_q, emp, a_a, m_a)
+        ov = _g(opps_v, emp, a, m); ov_a = _g(opps_v, emp, a_a, m_a)
         gq = _g(ganhas_q, emp, a, m); gq_a = _g(ganhas_q, emp, a_a, m_a)
         gv = _g(ganhas_v, emp, a, m); gv_a = _g(ganhas_v, emp, a_a, m_a)
 
         if ie:
             kh = kwh_m.get((a,m),0); kh_a = kwh_m.get((a_a,m_a),0)
-            vol = _fk(kh); vol_a = _fk(kh_a); vol_lab = "Energia"
-            v_vol = _var(kh, du_h, kh_a, du_ant); vol_cor = "#EC8500"
+            vol_vend = _fk(kh); vol_lab = "Energia"
+            v_vol_vend = _var(kh, du_h, kh_a, du_ant); vol_cor = "#EC8500"
+            # Volume orcado = Amount das opps criadas (para Energy tambem e R$, pois nao tem kWh nas opps criadas)
+            vol_orc = _fv(ov); v_vol_orc = _var(ov, du_h, ov_a, du_ant)
         else:
-            vol = _fv(gv); vol_a = _fv(gv_a); vol_lab = "Valor"
-            v_vol = _var(gv, du_h, gv_a, du_ant); vol_cor = "#2E7D32"
+            vol_vend = _fv(gv); vol_lab = "Valor"
+            v_vol_vend = _var(gv, du_h, gv_a, du_ant); vol_cor = "#2E7D32"
+            vol_orc = _fv(ov); v_vol_orc = _var(ov, du_h, ov_a, du_ant)
 
         v_oq = _var(oq, du_h, oq_a, du_ant)
         v_gq = _var(gq, du_h, gq_a, du_ant)
 
-        # Card
+        # Card com 4 blocos: Orçamentos | Vol Orçado | Vendas | Vol Vendido
         st.markdown(f"""
-<div style="background:white;border-radius:12px 12px 0 0;padding:16px 20px;margin-bottom:0;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-left:5px solid {cor}">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-<span style="font-weight:700;color:{cor};font-size:1.05rem">{label}</span>
-<span style="font-size:0.7rem;color:#999">vs {n_ant} (por DU)</span>
+<div style="background:white;border-radius:12px 12px 0 0;padding:18px 22px;margin-bottom:0;box-shadow:0 2px 6px rgba(0,0,0,0.06);border-left:5px solid {cor}">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+<span style="font-weight:700;color:{cor};font-size:1.1rem">{label}</span>
+<span style="font-size:0.75rem;color:#999">vs {n_ant} (por DU)</span>
 </div>
 <div style="display:flex;gap:0;flex-wrap:wrap">
-<div style="flex:1;min-width:120px;text-align:center;padding:6px 10px;border-right:1px solid #f0f0f0">
-<div style="font-size:1.3rem;font-weight:700;color:#1565C0">{_fmt(oq)}</div>
-<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">Orcamentos</div>
+<div style="flex:1;min-width:110px;text-align:center;padding:8px 10px;border-right:1px solid #f0f0f0">
+<div style="font-size:1.4rem;font-weight:700;color:#1565C0">{_fmt(oq)}</div>
+<div style="font-size:0.65rem;color:#888;text-transform:uppercase;margin:3px 0">Orcamentos</div>
 <div>{v_oq}</div>
 </div>
-<div style="flex:1;min-width:120px;text-align:center;padding:6px 10px;border-right:1px solid #f0f0f0">
-<div style="font-size:1.3rem;font-weight:700;color:#2E7D32">{_fmt(gq)}</div>
-<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">Vendas</div>
+<div style="flex:1;min-width:110px;text-align:center;padding:8px 10px;border-right:1px solid #f0f0f0">
+<div style="font-size:1.4rem;font-weight:700;color:#1565C0">{vol_orc}</div>
+<div style="font-size:0.65rem;color:#888;text-transform:uppercase;margin:3px 0">{vol_lab} Orcado</div>
+<div>{v_vol_orc}</div>
+</div>
+<div style="flex:1;min-width:110px;text-align:center;padding:8px 10px;border-right:1px solid #f0f0f0">
+<div style="font-size:1.4rem;font-weight:700;color:#2E7D32">{_fmt(gq)}</div>
+<div style="font-size:0.65rem;color:#888;text-transform:uppercase;margin:3px 0">Vendas</div>
 <div>{v_gq}</div>
 </div>
-<div style="flex:1;min-width:120px;text-align:center;padding:6px 10px">
-<div style="font-size:1.3rem;font-weight:700;color:{vol_cor}">{vol}</div>
-<div style="font-size:0.55rem;color:#888;text-transform:uppercase;margin:2px 0">{vol_lab} Vendido</div>
-<div>{v_vol}</div>
+<div style="flex:1;min-width:110px;text-align:center;padding:8px 10px">
+<div style="font-size:1.4rem;font-weight:700;color:{vol_cor}">{vol_vend}</div>
+<div style="font-size:0.65rem;color:#888;text-transform:uppercase;margin:3px 0">{vol_lab} Vendido</div>
+<div>{v_vol_vend}</div>
 </div>
 </div>
 <div style="font-size:0.7rem;color:#999;margin-top:6px;padding-top:6px;border-top:1px solid #f5f5f5">
@@ -199,17 +208,31 @@ try:
         cor = CORES.get(emp,{}).get("primaria","#1a1a2e")
         label = EMPRESA_LABELS.get(emp,emp)
         ie = (emp == "Flex Energy")
-        tab = []
+        vol_col = "Energia" if ie else "Valor"
+
+        rows_html = ""
         for (ano, mes) in meses:
             du = dias_uteis_no_mes(ano, mes)
             oq = _g(opps_q, emp, ano, mes)
             gq = _g(ganhas_q, emp, ano, mes)
             gv = _g(ganhas_v, emp, ano, mes)
-            wr = (gq/oq*100) if oq > 0 else 0
+            wr = f"{(gq/oq*100):.0f}%" if oq > 0 else "\u2014"
             vol = _fk(kwh_m.get((ano,mes),0)) if ie else _fv(gv)
-            tab.append({"Mes": f"{MESES_PT[mes]}/{ano}", "DU": du, "Orcs": int(oq), "Vendas": int(gq), "Win%": f"{wr:.0f}%", "Volume": vol})
-        st.markdown(f'<div style="border-left:4px solid {cor};padding-left:10px;margin:8px 0 4px 0;font-weight:600;color:{cor}">{label}</div>', unsafe_allow_html=True)
-        st.dataframe(pd.DataFrame(tab), width="stretch", hide_index=True)
+            orc_du = f"{oq/du:.1f}" if du > 0 else "\u2014"
+            vend_du = f"{gq/du:.1f}" if du > 0 else "\u2014"
+            bg = "#fff" if len(rows_html) % 2 == 0 else "#F8F9FA"
+            rows_html += f'<tr style="background:{bg}"><td style="font-weight:600;color:#1a1a2e">{MESES_PT[mes]}/{ano}</td><td style="text-align:center;color:#888">{du}</td><td style="text-align:center;font-weight:600;color:#1565C0;font-size:1.05rem">{_fmt(oq)}</td><td style="text-align:center;color:#888">{orc_du}</td><td style="text-align:center;font-weight:700;color:#2E7D32;font-size:1.05rem">{_fmt(gq)}</td><td style="text-align:center;color:#888">{vend_du}</td><td style="text-align:center;color:#555">{wr}</td><td style="text-align:right;font-weight:600;color:{cor}">{vol}</td></tr>'
+
+        hdr = f'<tr style="background:#1a1a2e"><th style="color:white;padding:10px 12px;font-size:0.75rem;text-transform:uppercase">Mes</th><th style="color:white;text-align:center;padding:10px 8px;font-size:0.75rem">DU</th><th style="color:white;text-align:center;padding:10px 8px;font-size:0.75rem">Orcs</th><th style="color:white;text-align:center;padding:10px 8px;font-size:0.7rem">Orcs/DU</th><th style="color:white;text-align:center;padding:10px 8px;font-size:0.75rem">Vendas</th><th style="color:white;text-align:center;padding:10px 8px;font-size:0.7rem">Vend/DU</th><th style="color:white;text-align:center;padding:10px 8px;font-size:0.75rem">Win%</th><th style="color:white;text-align:right;padding:10px 12px;font-size:0.75rem">{vol_col}</th></tr>'
+
+        st.markdown(f"""
+<div style="margin:12px 0 16px 0">
+<div style="border-left:4px solid {cor};padding:8px 14px;margin-bottom:0;font-weight:700;color:{cor};font-size:1rem;background:white;border-radius:8px 8px 0 0">{label}</div>
+<table style="width:100%;border-collapse:collapse;border-radius:0 0 8px 8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+{hdr}{rows_html}
+</table>
+</div>
+""", unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"Erro: {e}")
