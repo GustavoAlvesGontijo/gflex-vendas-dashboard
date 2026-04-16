@@ -10,6 +10,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 if not st.session_state.get("authenticated", False):
     st.warning("Acesse pela pagina principal para fazer login.")
     st.stop()
+from styles import inject_css
+inject_css()
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import date
@@ -102,45 +104,40 @@ try:
 </div>
 """, unsafe_allow_html=True)
 
-        # Grafico de barras agrupadas com 2 eixos
-        fig = go.Figure()
-
+        # 2 graficos lado a lado: Volume (barras grandes) + Vendas (barras)
+        from plotly.subplots import make_subplots
         vol_label = "Energia (kWh)" if ie else "Valor Vendido (R$)"
 
-        # Barras 1: Volume vendido — DESTAQUE (barras grandes, cor da empresa)
+        fig = make_subplots(rows=1, cols=2, subplot_titles=[vol_label, "Vendas (qtd)"], horizontal_spacing=0.08)
+
+        # Barras Volume — COR DA EMPRESA, valor dentro
         fig.add_trace(go.Bar(
             x=meses_label, y=vendas_vol, name=vol_label,
-            marker_color=cor, opacity=0.85,
+            marker_color=cor, opacity=0.9,
             text=[_fk(v) if ie else _fv(v) for v in vendas_vol],
-            textposition="outside",
-            textfont=dict(size=11, color=cor, family="Arial Black"),
-            yaxis="y",
-        ))
+            textposition="inside", textangle=0,
+            textfont=dict(size=12, color="white", family="Arial Black"),
+            showlegend=False,
+        ), row=1, col=1)
 
-        # Barras 2: Quantidade de vendas (barras menores, verde)
+        # Barras Vendas — VERDE, qtd dentro
         fig.add_trace(go.Bar(
-            x=meses_label, y=vendas_qtd, name="Vendas (qtd)",
-            marker_color="#2E7D32", opacity=0.7,
+            x=meses_label, y=vendas_qtd, name="Vendas",
+            marker_color="#2E7D32", opacity=0.9,
             text=[str(v) for v in vendas_qtd],
-            textposition="outside",
-            textfont=dict(size=10, color="#2E7D32"),
-            yaxis="y2",
-        ))
+            textposition="inside", textangle=0,
+            textfont=dict(size=14, color="white", family="Arial Black"),
+            showlegend=False,
+        ), row=1, col=2)
 
         fig.update_layout(
-            barmode="group",
-            height=360,
-            margin=dict(t=30, b=40, l=50, r=60),
-            showlegend=True,
-            legend=dict(orientation="h", y=-0.12, x=0.5, xanchor="center", font=dict(size=11)),
-            yaxis=dict(title=vol_label, side="left", showgrid=True, gridcolor="#f0f0f0", zeroline=False),
-            yaxis2=dict(title="Vendas (qtd)", side="right", overlaying="y", showgrid=False, zeroline=False),
+            height=340,
+            margin=dict(t=40, b=20, l=30, r=20),
             plot_bgcolor="white",
             paper_bgcolor="white",
             font=dict(family="Inter, Arial, sans-serif"),
-            bargap=0.25,
-            bargroupgap=0.1,
         )
+        fig.update_yaxes(showgrid=True, gridcolor="#f0f0f0", zeroline=False)
         st.plotly_chart(fig, use_container_width=True)
 
         # Tabela HTML atrativa

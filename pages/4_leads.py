@@ -10,6 +10,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 if not st.session_state.get("authenticated", False):
     st.warning("Acesse pela pagina principal para fazer login.")
     st.stop()
+from styles import inject_css
+inject_css()
 import pandas as pd
 from datetime import date
 from config import (
