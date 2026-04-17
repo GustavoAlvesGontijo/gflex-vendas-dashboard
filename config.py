@@ -33,6 +33,37 @@ EMPRESA_LABELS = {
     "Flex Solar": "Flex Solar",
 }
 
+# Mapeamento empresa -> arquivo de logo
+EMPRESA_LOGOS = {
+    "Flex Energy": "flex_energy.png",
+    "GF2 Solu\u00e7\u00f5es Integradas": "gf2.png",
+    "Flex Tendas": "flex_tendas.png",
+    "Flex Medi\u00e7\u00f5es": "flex_medicoes.png",
+    "MEC Estruturas Met\u00e1licas": "mec.png",
+    "Flex Solar": "flex_solar.png",
+}
+
+import base64 as _b64
+from pathlib import Path as _Path
+
+_logo_cache = {}
+
+def get_logo_b64(empresa: str) -> str:
+    """Retorna a logo da empresa como string base64 (para usar em <img src=...> HTML)."""
+    if empresa in _logo_cache:
+        return _logo_cache[empresa]
+    fname = EMPRESA_LOGOS.get(empresa)
+    if not fname:
+        return ""
+    path = _Path(__file__).parent / "assets" / "logos" / fname
+    if not path.exists():
+        return ""
+    with open(path, "rb") as f:
+        b64 = _b64.b64encode(f.read()).decode("ascii")
+    result = f"data:image/png;base64,{b64}"
+    _logo_cache[empresa] = result
+    return result
+
 # --- Cores por empresa (manual da marca) ---
 CORES = {
     "GFlex": {"primaria": "#1a1a2e", "secundaria": "#EC8500", "fundo": "#f5f5f5"},

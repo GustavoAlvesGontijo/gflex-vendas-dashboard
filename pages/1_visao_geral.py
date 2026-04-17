@@ -18,7 +18,7 @@ from datetime import date
 from config import (
     EMPRESAS, EMPRESA_LABELS, CORES,
     dias_uteis_no_mes, dias_uteis_ate_hoje,
-    MESES_PT, MESES_PT_FULL,
+    MESES_PT, MESES_PT_FULL, get_logo_b64,
 )
 from salesforce_client import (
     get_leads_mensal_por_empresa,
@@ -134,12 +134,10 @@ try:
     st.markdown(f'<h3 style="font-size:1.3rem;color:#1a1a2e">\U0001f4c8 VENDAS + PIPELINE — {MESES_PT[m].upper()}/{a}</h3>', unsafe_allow_html=True)
     st.markdown(f'<p style="color:#666;font-size:0.9rem;margin-top:-8px">O que ja vendemos, o que esta em negociacao e o pipeline total \u2014 cada empresa vs {n_ant} (por dia util)</p>', unsafe_allow_html=True)
 
-    icones = {"Flex Energy":"\u26a1","GF2 Solu\u00e7\u00f5es Integradas":"\U0001f529","Flex Tendas":"\u26fa","Flex Medi\u00e7\u00f5es":"\U0001f52c","MEC Estruturas Met\u00e1licas":"\U0001f3d7\ufe0f","Flex Solar":"\u2600\ufe0f"}
-
     for emp in EMPRESAS:
         cor = CORES[emp]["primaria"]
         label = EMPRESA_LABELS[emp]
-        ic = icones.get(emp,"\U0001f4ca")
+        logo = get_logo_b64(emp)
         ie = (emp == "Flex Energy")
 
         gq = _g(ganhas_q, emp, a, m); gq_a = _g(ganhas_q, emp, a_a, m_a)
@@ -170,7 +168,7 @@ try:
         st.markdown(f"""
 <div style="background:white;border-radius:12px;padding:16px 20px;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,0,0,0.06);border-left:5px solid {cor}">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-<span style="font-weight:700;color:{cor};font-size:1.1rem">{ic} {label}</span>
+<div style="display:flex;align-items:center;gap:12px"><img src="{logo}" style="height:40px;border-radius:6px" alt="{label}"/><span style="font-weight:700;color:{cor};font-size:1.1rem">{label}</span></div>
 <span style="font-size:0.7rem;color:#999">vs {n_ant} (por DU)</span>
 </div>
 <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -252,7 +250,7 @@ try:
             rows += f'<div style="display:flex;align-items:center;padding:5px 0;border-top:2px solid #ddd;font-weight:700"><div style="flex:2;font-size:0.8rem">TOTAL</div><div style="flex:1;text-align:right">{_fmt(sum_l)}</div><div style="flex:1;text-align:right;color:#1565C0">{_fmt(sum_o)}</div><div style="flex:1;text-align:right;color:#2E7D32">{_fmt(sum_g)}</div><div style="flex:1;text-align:right;color:#666">{svf}</div><div style="flex:1;text-align:right">{stx}</div></div>'
 
             hdr = f'<div style="display:flex;padding:2px 0;border-bottom:2px solid #eee;margin-bottom:2px"><div style="flex:2;font-size:0.6rem;color:#999;text-transform:uppercase">Origem</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">Leads</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">Orcaram</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">Venderam</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">{unid}</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">Win%</div></div>'
-            st.markdown(f'<div style="background:white;border-radius:12px;padding:14px 20px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-top:3px solid {cor}"><div style="font-weight:700;color:{cor};margin-bottom:8px;font-size:0.95rem">{label}</div>{hdr}{rows}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background:white;border-radius:12px;padding:14px 20px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-top:3px solid {cor}"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><img src="{get_logo_b64(emp)}" style="height:30px;border-radius:5px" alt="{label}"/><span style="font-weight:700;color:{cor};font-size:0.95rem">{label}</span></div>{hdr}{rows}</div>', unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -284,7 +282,7 @@ try:
             gv = _g(ganhas_v, emp, ano, mes)
             vol = _fk(kwh_m.get((ano,mes),0)) if ie else _fv(gv)
             tab.append({"Mes": f"{MESES_PT[mes]}/{ano}", "DU": du, "Leads": int(lq), "Conv": int(cm), "Orcs": int(oq), "Vendas": int(gq), "Volume": vol})
-        st.markdown(f'<div style="border-left:4px solid {cor};padding-left:10px;margin:8px 0 4px 0;font-weight:600;color:{cor}">{label}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="display:flex;align-items:center;gap:10px;border-left:4px solid {cor};padding:6px 10px;margin:8px 0 4px 0;font-weight:600;color:{cor}"><img src="{get_logo_b64(emp)}" style="height:28px;border-radius:4px" alt="{label}"/><span>{label}</span></div>', unsafe_allow_html=True)
         st.dataframe(pd.DataFrame(tab), width="stretch", hide_index=True)
 
 except Exception as e:

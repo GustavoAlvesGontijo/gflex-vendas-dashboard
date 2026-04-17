@@ -17,7 +17,7 @@ import pandas as pd
 from datetime import date
 from config import (
     EMPRESAS, EMPRESA_LABELS, CORES,
-    dias_uteis_no_mes, MESES_PT,
+    dias_uteis_no_mes, MESES_PT, get_logo_b64,
 )
 from salesforce_client import (
     get_opps_ganhas_mensal_por_empresa,
@@ -95,7 +95,7 @@ try:
         st.markdown(f"""
 <div style="background:white;border-radius:12px;padding:16px 20px;margin-bottom:4px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-left:5px solid {cor}">
 <div style="display:flex;justify-content:space-between;align-items:center">
-<span style="font-weight:700;color:{cor};font-size:1.05rem">{label} \u2014 {af}</span>
+<div style="display:flex;align-items:center;gap:12px"><img src="{get_logo_b64(emp)}" style="height:38px;border-radius:6px" alt="{label}"/><span style="font-weight:700;color:{cor};font-size:1.05rem">{label} \u2014 {af}</span></div>
 <div style="display:flex;gap:20px">
 <div style="text-align:center"><span style="font-size:1.3rem;font-weight:700;color:#2E7D32">{_fmt(total_v)}</span><div style="font-size:0.55rem;color:#888;text-transform:uppercase">vendas no ano</div></div>
 <div style="text-align:center"><span style="font-size:1.3rem;font-weight:700;color:{cor}">{vol_total_fmt}</span><div style="font-size:0.55rem;color:#888;text-transform:uppercase">{unid} no ano</div></div>

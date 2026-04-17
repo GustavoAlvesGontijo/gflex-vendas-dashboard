@@ -16,7 +16,7 @@ import pandas as pd
 from datetime import date
 from config import (
     EMPRESAS, EMPRESA_LABELS, CORES,
-    dias_uteis_no_mes, dias_uteis_ate_hoje, MESES_PT,
+    dias_uteis_no_mes, dias_uteis_ate_hoje, MESES_PT, get_logo_b64,
 )
 from salesforce_client import (
     get_leads_por_status, get_leads_por_origem,
@@ -95,7 +95,7 @@ try:
         st.markdown(f"""
 <div style="background:white;border-radius:12px;padding:14px 18px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-left:5px solid {cor}">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-<span style="font-weight:700;color:{cor};font-size:1rem">{label}</span>
+<div style="display:flex;align-items:center;gap:12px"><img src="{get_logo_b64(emp)}" style="height:36px;border-radius:6px" alt="{label}"/><span style="font-weight:700;color:{cor};font-size:1rem">{label}</span></div>
 <span style="font-size:0.7rem;color:#999">vs {n_ant}</span>
 </div>
 <div style="display:flex;gap:0;flex-wrap:wrap">
@@ -154,7 +154,7 @@ try:
                 items += f'<div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid #f8f8f8"><div style="flex:2;font-size:0.8rem">{orig}</div><div style="flex:1;text-align:right;font-weight:600">{_fmt(qtd)}</div><div style="flex:1;text-align:right;color:#888;font-size:0.8rem">{pct:.0f}%</div><div style="flex:1;text-align:right">{vh}</div></div>'
 
             hdr = f'<div style="display:flex;padding:2px 0;border-bottom:2px solid #eee;margin-bottom:2px"><div style="flex:2;font-size:0.6rem;color:#999;text-transform:uppercase">Origem</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">Qtd</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">%</div><div style="flex:1;text-align:right;font-size:0.6rem;color:#999;text-transform:uppercase">vs {n_ant}</div></div>'
-            st.markdown(f'<div style="background:white;border-radius:10px;padding:14px 20px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-top:3px solid {cor}"><div style="font-weight:700;color:{cor};margin-bottom:8px;font-size:0.95rem">{label}</div>{hdr}{items}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="background:white;border-radius:10px;padding:14px 20px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-top:3px solid {cor}"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><img src="{get_logo_b64(emp)}" style="height:30px;border-radius:5px" alt="{label}"/><span style="font-weight:700;color:{cor};font-size:0.95rem">{label}</span></div>{hdr}{items}</div>', unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -193,7 +193,7 @@ try:
         st.markdown(f"""
 <div style="background:white;border-radius:12px;padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.05);border-left:5px solid {cor}">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-<span style="font-weight:700;color:{cor};font-size:0.95rem">{label}</span>
+<div style="display:flex;align-items:center;gap:10px"><img src="{get_logo_b64(emp)}" style="height:32px;border-radius:5px" alt="{label}"/><span style="font-weight:700;color:{cor};font-size:0.95rem">{label}</span></div>
 <span style="font-size:0.8rem;font-weight:600;color:#1a1a2e">{_fmt(total)} leads</span>
 </div>
 {hdr}{rows}
@@ -228,7 +228,7 @@ try:
             f1 = (cc/lq*100) if lq > 0 else 0
             ct = _g(contas_d, emp, ano, mes)
             tab.append({"Mes": f"{MESES_PT[mes]}/{ano}", "DU": du, "Leads": int(lq), "Conv": int(cm), "%F1": f"{f1:.1f}%", "Contas": int(ct)})
-        st.markdown(f'<div style="border-left:4px solid {cor};padding-left:10px;margin:8px 0 4px 0;font-weight:600;color:{cor}">{label}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="display:flex;align-items:center;gap:10px;border-left:4px solid {cor};padding:6px 10px;margin:8px 0 4px 0;font-weight:600;color:{cor}"><img src="{get_logo_b64(emp)}" style="height:28px;border-radius:4px" alt="{label}"/><span>{label}</span></div>', unsafe_allow_html=True)
         st.dataframe(pd.DataFrame(tab), width="stretch", hide_index=True)
 
 except Exception as e:

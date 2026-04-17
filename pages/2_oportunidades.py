@@ -16,7 +16,7 @@ import pandas as pd
 from datetime import date
 from config import (
     EMPRESAS, EMPRESA_LABELS, CORES, FASES_PIPELINE,
-    dias_uteis_no_mes, dias_uteis_ate_hoje, MESES_PT,
+    dias_uteis_no_mes, dias_uteis_ate_hoje, MESES_PT, get_logo_b64,
 )
 from salesforce_client import (
     get_opps_mensal_por_empresa, get_opps_ganhas_mensal_por_empresa,
@@ -130,7 +130,7 @@ try:
         st.markdown(f"""
 <div style="background:white;border-radius:12px 12px 0 0;padding:18px 22px;margin-bottom:0;box-shadow:0 2px 6px rgba(0,0,0,0.06);border-left:5px solid {cor}">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-<span style="font-weight:700;color:{cor};font-size:1.1rem">{label}</span>
+<div style="display:flex;align-items:center;gap:12px"><img src="{get_logo_b64(emp)}" style="height:40px;border-radius:6px" alt="{label}"/><span style="font-weight:700;color:{cor};font-size:1.1rem">{label}</span></div>
 <span style="font-size:0.75rem;color:#999">vs {n_ant} (por DU)</span>
 </div>
 <div style="display:flex;gap:0;flex-wrap:wrap">
@@ -243,7 +243,7 @@ try:
 
         st.markdown(f"""
 <div style="margin:12px 0 16px 0">
-<div style="border-left:4px solid {cor};padding:8px 14px;margin-bottom:0;font-weight:700;color:{cor};font-size:1rem;background:white;border-radius:8px 8px 0 0">{label}</div>
+<div style="display:flex;align-items:center;gap:10px;border-left:4px solid {cor};padding:8px 14px;margin-bottom:0;font-weight:700;color:{cor};font-size:1rem;background:white;border-radius:8px 8px 0 0"><img src="{get_logo_b64(emp)}" style="height:28px;border-radius:4px" alt="{label}"/><span>{label}</span></div>
 <table style="width:100%;border-collapse:collapse;border-radius:0 0 8px 8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
 {hdr}{rows_html}
 </table>
