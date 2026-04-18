@@ -15,7 +15,12 @@ def check_password():
     try:
         correct = st.secrets["app"]["password"]
     except Exception:
-        correct = "gflex2026"  # fallback local
+        # Fallback para desenvolvimento local apenas — usa env var, nao hardcode
+        import os as _os
+        correct = _os.getenv("APP_PASSWORD", "")
+        if not correct:
+            st.error("Senha nao configurada. Configure st.secrets ou APP_PASSWORD.")
+            st.stop()
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
     if st.session_state.authenticated:
