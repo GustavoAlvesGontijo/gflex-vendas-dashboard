@@ -4,6 +4,8 @@ Autenticacao + Sidebar com filtros globais.
 """
 import streamlit as st
 from config import EMPRESAS, EMPRESA_LABELS, CORES, get_periodo
+from styles import inject_css
+from components import page_header, icon
 
 st.set_page_config(page_title="GFlex Vendas", page_icon="\U0001f4ca", layout="wide", initial_sidebar_state="expanded")
 
@@ -45,55 +47,18 @@ def check_password():
 if not check_password():
     st.stop()
 
-# CSS premium executivo
-st.markdown("""
-<style>
-/* Header escuro */
-[data-testid="stHeader"]{background-color:#1a1a2e}
-/* Sidebar */
-[data-testid="stSidebar"]{background:#f8f9fa}
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h1{color:#1a1a2e;font-size:1.3rem}
-/* Sidebar NAV — icones e destaque */
-[data-testid="stSidebarNav"]{padding-top:8px}
-[data-testid="stSidebarNav"] a{
-    font-size:0.95rem!important;font-weight:500;padding:10px 16px!important;
-    border-radius:8px;margin:2px 8px;transition:all 0.2s;
-    color:#333!important;text-decoration:none!important;
-}
-[data-testid="stSidebarNav"] a:hover{background:#EC850012;color:#EC8500!important}
-[data-testid="stSidebarNav"] a[aria-selected="true"]{
-    background:linear-gradient(90deg,#EC850018,#EC850008)!important;
-    border-left:4px solid #EC8500!important;font-weight:700!important;
-    color:#1a1a2e!important;
-}
-/* Metricas */
-[data-testid="stMetricValue"]{font-size:1.5rem;font-weight:700;color:#1a1a2e}
-[data-testid="stMetricLabel"]{font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#666}
-/* Tabelas premium — fontes maiores, mais contraste */
-[data-testid="stDataFrame"] table{border-collapse:collapse;width:100%}
-[data-testid="stDataFrame"] th{
-    background:#1a1a2e!important;color:white!important;
-    font-weight:600;font-size:0.85rem!important;text-transform:uppercase;
-    letter-spacing:0.3px;padding:12px 14px!important;
-}
-[data-testid="stDataFrame"] td{
-    padding:10px 14px!important;font-size:0.95rem!important;
-    border-bottom:1px solid #eee!important;color:#1a1a2e!important;
-}
-[data-testid="stDataFrame"] tr:nth-child(even){background:#F8F9FA!important}
-[data-testid="stDataFrame"] tr:hover{background:#FFF3E0!important}
-/* Footer */
-footer{visibility:hidden}
-/* Scrollbar */
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
-</style>
-""", unsafe_allow_html=True)
+# CSS unificado (Hub-like: Inter, vars, dark-mode aware, cards premium)
+inject_css()
 
 # Sidebar
 with st.sidebar:
-    st.markdown('<div style="text-align:center;padding:8px 0 12px 0"><h1 style="margin:0;font-size:1.4rem">\U0001f4ca GFlex</h1><div style="color:#EC8500;font-size:0.75rem;font-weight:600;letter-spacing:1.5px;text-transform:uppercase">Painel de Vendas</div></div>', unsafe_allow_html=True)
-    st.markdown("---")
+    st.markdown(
+        '<div style="text-align:center;padding:12px 0 16px 0;border-bottom:1px solid var(--border);margin-bottom:14px">'
+        '<div style="font-size:1.5rem;font-weight:800;color:var(--text);letter-spacing:-0.5px">GFlex</div>'
+        '<div style="color:var(--accent);font-size:0.7rem;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;margin-top:2px">Painel de Vendas</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     opcoes = ["Todas"] + [EMPRESA_LABELS[e] for e in EMPRESAS]
     emp_label = st.selectbox("Empresa", opcoes, index=0, key="filtro_empresa")
@@ -115,15 +80,22 @@ with st.sidebar:
         di, df = get_periodo(periodo)
     st.session_state["data_inicio"] = di
     st.session_state["data_fim"] = df
-    st.markdown("---")
-    st.caption("Salesforce API \u00b7 Cache 5 min")
+    st.markdown(
+        '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);'
+        'font-size:0.7rem;color:var(--text-muted);text-align:center">'
+        'Salesforce API \u00b7 Cache 5 min</div>',
+        unsafe_allow_html=True,
+    )
 
-# Pagina principal — redirecionamento visual
-st.markdown("""
-<div style="background:linear-gradient(135deg,#1a1a2e 0%,#2d2d5e 100%);padding:40px 32px;border-radius:16px;margin-bottom:24px;text-align:center">
-<h1 style="color:white;margin:0;font-size:2rem;font-weight:700">Dashboard de Vendas</h1>
-<p style="color:#EC8500;margin:8px 0 0 0;font-size:1rem;font-weight:500">GFlex Empresas \u2014 6 empresas em tempo real</p>
-</div>
-""", unsafe_allow_html=True)
+# Pagina principal - banner Hub-like
+st.markdown(page_header(
+    title="Dashboard de Vendas",
+    subtitle="GFlex Empresas - 6 empresas em tempo real",
+), unsafe_allow_html=True)
 
-st.markdown("Selecione uma secao no menu lateral para comecar a analise.")
+st.markdown(
+    '<div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:0.95rem">'
+    'Selecione uma secao no menu lateral para comecar a analise.'
+    '</div>',
+    unsafe_allow_html=True,
+)
