@@ -381,6 +381,75 @@ def get_os_mensal_por_empresa() -> pd.DataFrame:
 
 
 # ============================================================
+# LICITACAO — slice especial Flex Tendas (LeadSource='Licitacao')
+# Ticket medio ~26x maior que demais origens — exige segmentacao.
+# Doc: _Brain/Empresa/Flex Locacoes - Negocio Completo.md
+# ============================================================
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_flex_tendas_licitacao_opps_mensal() -> pd.DataFrame:
+    """Opps Flex Tendas com LeadSource='Licitacao' por mes (CreatedDate)."""
+    soql = """
+        SELECT CALENDAR_MONTH(CreatedDate) mes, CALENDAR_YEAR(CreatedDate) ano,
+               COUNT(Id) total, SUM(Amount) valor
+        FROM Opportunity
+        WHERE Empresa_Proprietaria__c = 'Flex Tendas'
+        AND LeadSource = 'Licitacao'
+        AND CreatedDate >= 2025-01-01T00:00:00Z
+        GROUP BY CALENDAR_MONTH(CreatedDate), CALENDAR_YEAR(CreatedDate)
+        ORDER BY CALENDAR_YEAR(CreatedDate), CALENDAR_MONTH(CreatedDate)
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_flex_tendas_licitacao_ganhas_mensal() -> pd.DataFrame:
+    """Opps Flex Tendas Licitacao ganhas por mes (CloseDate)."""
+    soql = """
+        SELECT CALENDAR_MONTH(CloseDate) mes, CALENDAR_YEAR(CloseDate) ano,
+               COUNT(Id) total, SUM(Amount) valor
+        FROM Opportunity
+        WHERE Empresa_Proprietaria__c = 'Flex Tendas'
+        AND LeadSource = 'Licitacao'
+        AND StageName = 'Fechado Ganho'
+        AND CloseDate >= 2025-01-01
+        GROUP BY CALENDAR_MONTH(CloseDate), CALENDAR_YEAR(CloseDate)
+        ORDER BY CALENDAR_YEAR(CloseDate), CALENDAR_MONTH(CloseDate)
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_flex_tendas_licitacao_pipeline() -> pd.DataFrame:
+    """Pipeline aberto Flex Tendas Licitacao por fase."""
+    soql = """
+        SELECT StageName, COUNT(Id) total, SUM(Amount) valor
+        FROM Opportunity
+        WHERE Empresa_Proprietaria__c = 'Flex Tendas'
+        AND LeadSource = 'Licitacao'
+        AND StageName NOT IN ('Fechado Ganho', 'Fechado Perdido')
+        GROUP BY StageName
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_flex_tendas_licitacao_leads_mensal() -> pd.DataFrame:
+    """Leads Flex Tendas com LeadSource='Licitacao' por mes."""
+    soql = """
+        SELECT CALENDAR_MONTH(CreatedDate) mes, CALENDAR_YEAR(CreatedDate) ano,
+               COUNT(Id) total
+        FROM Lead
+        WHERE Empresa_Proprietaria__c = 'Flex Tendas'
+        AND LeadSource = 'Licitacao'
+        AND CreatedDate >= 2025-01-01T00:00:00Z
+        GROUP BY CALENDAR_MONTH(CreatedDate), CALENDAR_YEAR(CreatedDate)
+        ORDER BY CALENDAR_YEAR(CreatedDate), CALENDAR_MONTH(CreatedDate)
+    """
+    return _query_to_df(soql)
+
+
+# ============================================================
 # PIPELINE ABERTO (opps em negociacao/contrato)
 # ============================================================
 

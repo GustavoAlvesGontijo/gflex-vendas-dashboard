@@ -30,6 +30,11 @@ from salesforce_client import (
     get_opps_por_origem_empresa,
     get_origens_funil_por_empresa,
     get_leads_convertidos_no_mes_por_empresa,
+    # Slice Licitacao Flex Tendas (ticket medio ~26x maior — segmentacao obrigatoria)
+    get_flex_tendas_licitacao_opps_mensal,
+    get_flex_tendas_licitacao_ganhas_mensal,
+    get_flex_tendas_licitacao_pipeline,
+    get_flex_tendas_licitacao_leads_mensal,
 )
 
 def _fmt(v):
@@ -128,6 +133,61 @@ try:
                 pipe_neg[e] = pipe_neg.get(e,0) + qtd
                 pipe_neg_val[e] = pipe_neg_val.get(e,0) + val
 
+    # =====================================
+    # LICITACAO \u2014 slice especial Flex Tendas (ticket ~26x maior)
+    # =====================================
+    df_lic_opps = get_flex_tendas_licitacao_opps_mensal()
+    df_lic_ganhas = get_flex_tendas_licitacao_ganhas_mensal()
+    df_lic_pipe = get_flex_tendas_licitacao_pipeline()
+    df_lic_leads = get_flex_tendas_licitacao_leads_mensal()
+
+    def _bd_lic(df, val="total"):
+        d = {}
+        if df.empty: return d
+        for _, r in df.iterrows():
+            k = (int(r["ano"]), int(r["mes"]))
+            v = r[val]
+            d[k] = float(v) if v is not None and not pd.isna(v) else 0
+        return d
+
+    lic_opps_q = _bd_lic(df_lic_opps, "total")
+    lic_opps_v = _bd_lic(df_lic_opps, "valor")
+    lic_gan_q = _bd_lic(df_lic_ganhas, "total")
+    lic_gan_v = _bd_lic(df_lic_ganhas, "valor")
+    lic_leads_q = _bd_lic(df_lic_leads, "total")
+
+    lic_pipe_q = 0; lic_pipe_v = 0.0; lic_neg_q = 0; lic_neg_v = 0.0
+    if not df_lic_pipe.empty:
+        fases_neg_lic = ["Negocia\u00e7\u00e3o", "Contrato"]
+        for _, r in df_lic_pipe.iterrows():
+            qtd = int(r["total"])
+            val = float(r["valor"]) if (r["valor"] is not None and not pd.isna(r["valor"])) else 0
+            lic_pipe_q += qtd; lic_pipe_v += val
+            if r["StageName"] in fases_neg_lic:
+                lic_neg_q += qtd; lic_neg_v += val
+
+    def _split_qtd(total_q, lic_q, show):
+        """HTML com 2 sub-linhas Licit / Outras para QUANTIDADE."""
+        if not show: return ""
+        out_q = max(0, int(total_q) - int(lic_q))
+        return (
+            '<div style="margin-top:4px;line-height:1.35;font-size:0.55rem;font-weight:600">'
+            f'<div style="color:#B45309">\u2696 Licit.: {_fmt(lic_q)}</div>'
+            f'<div style="color:#888">Outras: {_fmt(out_q)}</div>'
+            '</div>'
+        )
+
+    def _split_val(total_v, lic_v, fmt_val, show):
+        """HTML com 2 sub-linhas Licit / Outras para VALOR (R$ ou kWh)."""
+        if not show: return ""
+        out_v = max(0, float(total_v) - float(lic_v))
+        return (
+            '<div style="margin-top:4px;line-height:1.35;font-size:0.55rem;font-weight:600">'
+            f'<div style="color:#B45309">\u2696 Licit.: {fmt_val(lic_v)}</div>'
+            f'<div style="color:#888">Outras: {fmt_val(out_v)}</div>'
+            '</div>'
+        )
+
     # ========================================
     # SECAO 1: VENDAS + PIPELINE por empresa
     # ========================================
@@ -139,6 +199,7 @@ try:
         label = EMPRESA_LABELS[emp]
         logo = get_logo_b64(emp)
         ie = (emp == "Flex Energy")
+        is_tendas = (emp == "Flex Tendas")
 
         gq = _g(ganhas_q, emp, a, m); gq_a = _g(ganhas_q, emp, a_a, m_a)
         gv = _g(ganhas_v, emp, a, m); gv_a = _g(ganhas_v, emp, a_a, m_a)
@@ -165,38 +226,54 @@ try:
         v_lq = _var(lq, du_h, lq_a, du_ant)
         v_oq = _var(oq, du_h, oq_a, du_ant)
 
+        # Sub-linhas Licitacao/Outras (so Flex Tendas)
+        lic_v_q = lic_gan_q.get((a,m), 0); lic_v_v = lic_gan_v.get((a,m), 0)
+        lic_o_q = lic_opps_q.get((a,m), 0); lic_o_v = lic_opps_v.get((a,m), 0)
+        lic_l_q = lic_leads_q.get((a,m), 0)
+        sp_vend_qtd = _split_qtd(gq, lic_v_q, is_tendas)
+        sp_vend_val = _split_val(gv, lic_v_v, _fv, is_tendas)
+        sp_neg_qtd = _split_qtd(pn, lic_neg_q, is_tendas)
+        sp_neg_val = _split_val(pnv, lic_neg_v, _fv, is_tendas)
+        sp_pipe_qtd = _split_qtd(pt, lic_pipe_q, is_tendas)
+        sp_pipe_val = _split_val(ptv, lic_pipe_v, _fv, is_tendas)
+        sp_lead_qtd = _split_qtd(lq, lic_l_q, is_tendas)
+        sp_orc_qtd = _split_qtd(oq, lic_o_q, is_tendas)
+
+        # Badge no header da Flex Tendas
+        lic_badge = ('<div style="display:inline-block;margin-left:10px;padding:3px 8px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:6px;color:#B45309;font-size:0.6rem;font-weight:700;letter-spacing:0.5px">⚖ SEGMENTADO LICITAÇÃO · OUTRAS</div>') if is_tendas else ""
+
         st.markdown(f"""
 <div style="background:white;border-radius:12px;padding:16px 20px;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,0,0,0.06);border-left:5px solid {cor}">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-<div style="display:flex;align-items:center;gap:12px"><img src="{logo}" style="height:40px;border-radius:6px" alt="{label}"/><span style="font-weight:700;color:{cor};font-size:1.1rem">{label}</span></div>
+<div style="display:flex;align-items:center;gap:12px"><img src="{logo}" style="height:40px;border-radius:6px" alt="{label}"/><span style="font-weight:700;color:{cor};font-size:1.1rem">{label}</span>{lic_badge}</div>
 <span style="font-size:0.7rem;color:#999">vs {n_ant} (por DU)</span>
 </div>
 <div style="display:flex;gap:10px;flex-wrap:wrap">
 <div style="flex:1;min-width:180px;background:#E8F5E9;border-radius:10px;padding:12px 16px">
 <div style="font-size:0.6rem;color:#2E7D32;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:6px">\u2705 Vendido no Mes</div>
 <div style="display:flex;gap:16px">
-<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#2E7D32">{_fmt(gq)}</div><div style="font-size:0.55rem;color:#666">vendas {v_gq}</div></div>
-<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#2E7D32">{vol}</div><div style="font-size:0.55rem;color:#666">{vol_lab} {v_vol}</div></div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#2E7D32">{_fmt(gq)}</div><div style="font-size:0.55rem;color:#666">vendas {v_gq}</div>{sp_vend_qtd}</div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#2E7D32">{vol}</div><div style="font-size:0.55rem;color:#666">{vol_lab} {v_vol}</div>{sp_vend_val}</div>
 </div>
 </div>
 <div style="flex:1;min-width:180px;background:#FFF3E0;border-radius:10px;padding:12px 16px">
 <div style="font-size:0.6rem;color:#E65100;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:6px">\U0001f525 Negociacao + Contrato</div>
 <div style="display:flex;gap:16px">
-<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#E65100">{_fmt(pn)}</div><div style="font-size:0.55rem;color:#666">opps</div></div>
-<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#E65100">{neg_vol}</div><div style="font-size:0.55rem;color:#666">{vol_lab}</div></div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#E65100">{_fmt(pn)}</div><div style="font-size:0.55rem;color:#666">opps</div>{sp_neg_qtd}</div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#E65100">{neg_vol}</div><div style="font-size:0.55rem;color:#666">{vol_lab}</div>{sp_neg_val}</div>
 </div>
 </div>
 <div style="flex:1;min-width:180px;background:#E3F2FD;border-radius:10px;padding:12px 16px">
 <div style="font-size:0.6rem;color:#1565C0;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:6px">\U0001f4cb Pipeline Total</div>
 <div style="display:flex;gap:16px">
-<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#1565C0">{_fmt(pt)}</div><div style="font-size:0.55rem;color:#666">opps abertas</div></div>
-<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#1565C0">{pipe_vol}</div><div style="font-size:0.55rem;color:#666">{vol_lab}</div></div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#1565C0">{_fmt(pt)}</div><div style="font-size:0.55rem;color:#666">opps abertas</div>{sp_pipe_qtd}</div>
+<div style="text-align:center"><div style="font-size:1.5rem;font-weight:700;color:#1565C0">{pipe_vol}</div><div style="font-size:0.55rem;color:#666">{vol_lab}</div>{sp_pipe_val}</div>
 </div>
 </div>
 <div style="flex:1;min-width:180px;padding:12px 16px">
 <div style="display:flex;gap:16px">
-<div style="text-align:center"><div style="font-size:1.2rem;font-weight:700;color:#555">{_fmt(lq)}</div><div style="font-size:0.55rem;color:#888">leads {v_lq}</div></div>
-<div style="text-align:center"><div style="font-size:1.2rem;font-weight:700;color:#555">{_fmt(oq)}</div><div style="font-size:0.55rem;color:#888">orcamentos {v_oq}</div></div>
+<div style="text-align:center"><div style="font-size:1.2rem;font-weight:700;color:#555">{_fmt(lq)}</div><div style="font-size:0.55rem;color:#888">leads {v_lq}</div>{sp_lead_qtd}</div>
+<div style="text-align:center"><div style="font-size:1.2rem;font-weight:700;color:#555">{_fmt(oq)}</div><div style="font-size:0.55rem;color:#888">orcamentos {v_oq}</div>{sp_orc_qtd}</div>
 </div>
 </div>
 </div>
