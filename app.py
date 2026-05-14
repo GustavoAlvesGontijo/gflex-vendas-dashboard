@@ -135,10 +135,12 @@ def _fk(v):
 try:
     from salesforce_client import (
         get_opps_ganhas_mensal_por_empresa, get_energy_kwh_mensal,
+        get_flex_tendas_licitacao_ganhas_mensal,
     )
     with st.spinner("Carregando ranking do mes..."):
         df_g = get_opps_ganhas_mensal_por_empresa()
         df_kwh = get_energy_kwh_mensal()
+        df_lic = get_flex_tendas_licitacao_ganhas_mensal()
 
     # Mes atual e mes anterior
     m_a = m - 1 if m > 1 else 12
@@ -151,6 +153,11 @@ try:
     ant_k = df_kwh[(df_kwh['ano']==a_a) & (df_kwh['mes']==m_a)] if not df_kwh.empty else df_kwh
     energy_kwh_mes = float(cur_k['total_kwh'].sum()) if not cur_k.empty else 0
     energy_kwh_ant = float(ant_k['total_kwh'].sum()) if not ant_k.empty else 0
+
+    # Licitacao Flex Tendas no mes atual (fica ESTATICA — nao projeta)
+    cur_lic = df_lic[(df_lic['ano']==a) & (df_lic['mes']==m)] if not df_lic.empty else df_lic
+    tendas_lic_qtd = int(cur_lic['total'].sum()) if not cur_lic.empty else 0
+    tendas_lic_val = float(cur_lic['valor'].sum()) if not cur_lic.empty else 0
 
     # mapas mes anterior por empresa
     ant_qtd = {}; ant_val = {}
@@ -170,23 +177,35 @@ try:
 
     for emp in EMPRESAS:
         is_energy = (emp == "Flex Energy")
+        is_tendas = (emp == "Flex Tendas")
         qtd, val = cur_g_map.get(emp, (0, 0.0))
         volume_atual = energy_kwh_mes if is_energy else val
         volume_anterior = energy_kwh_ant if is_energy else ant_val.get(emp, 0.0)
         qtd_anterior = ant_qtd.get(emp, 0)
 
         # Forecast (so faz sentido se ja passou pelo menos 1 DU)
+        forecast_note = ""
         if du_h > 0 and du_t > 0:
-            rate_qtd = qtd / du_h
-            forecast_qtd = round(rate_qtd * du_t)
-            rate_vol = volume_atual / du_h
-            forecast_vol = rate_vol * du_t
+            if is_tendas:
+                # Tendas: licitacao e ESTATICA (4 contratos enormes nao se prevem),
+                # so "outras origens" sao multiplicadas pelo rate de DU
+                out_qtd = max(0, qtd - tendas_lic_qtd)
+                out_val = max(0, val - tendas_lic_val)
+                # outras projetadas
+                out_qtd_proj = (out_qtd / du_h) * du_t
+                out_val_proj = (out_val / du_h) * du_t
+                # somar com licitacao estatica
+                forecast_qtd = round(tendas_lic_qtd + out_qtd_proj)
+                forecast_vol = tendas_lic_val + out_val_proj
+                forecast_note = "Licitação fixada · só Outras projetam"
+            else:
+                forecast_qtd = round((qtd / du_h) * du_t)
+                forecast_vol = (volume_atual / du_h) * du_t
         else:
             forecast_qtd = qtd
             forecast_vol = volume_atual
 
         # Variacao da projecao vs total mes anterior
-        var_qtd_pct = ((forecast_qtd - qtd_anterior) / qtd_anterior * 100) if qtd_anterior > 0 else None
         var_vol_pct = ((forecast_vol - volume_anterior) / volume_anterior * 100) if volume_anterior > 0 else None
 
         rank_data.append({
@@ -195,12 +214,14 @@ try:
             "volume_atual_fmt": _fk(energy_kwh_mes) if is_energy else _fv(val),
             "unidade": "kWh" if is_energy else "R$",
             "forecast_qtd": int(forecast_qtd),
+            "forecast_vol": forecast_vol,
             "forecast_vol_fmt": _fk(forecast_vol) if is_energy else _fv(forecast_vol),
+            "forecast_note": forecast_note,
             "qtd_anterior": qtd_anterior,
             "volume_anterior_fmt": _fk(volume_anterior) if is_energy else _fv(volume_anterior),
-            "var_qtd_pct": var_qtd_pct,
             "var_vol_pct": var_vol_pct,
             "is_energy": is_energy,
+            "is_tendas": is_tendas,
         })
 
     # Ordena por qtd (universal); desempata por volume
@@ -220,33 +241,53 @@ try:
         )
 
     medals = ["\U0001f947", "\U0001f948", "\U0001f949"]
+    # Cor de destaque pro forecast — roxo (contrasta com a cor da empresa)
+    FC_COLOR = "#7c3aed"  # purple-600
+    FC_COLOR_BG = "#7c3aed10"
     rows_html = ""
     for i, r in enumerate(rank_data):
         cor = CORES.get(r['empresa'], {}).get("primaria", "#999")
         label = EMPRESA_LABELS.get(r['empresa'], r['empresa'])
         pos = medals[i] if i < 3 else f'<span style="color:var(--text-muted);font-weight:700;font-size:0.9rem">#{i+1}</span>'
+        note_html = (
+            f'<div style="font-size:0.55rem;color:#B45309;font-weight:700;margin-top:1px;'
+            f'text-transform:uppercase;letter-spacing:0.4px">⚖ {r["forecast_note"]}</div>'
+        ) if r["forecast_note"] else ""
         rows_html += (
-            '<div style="background:var(--bg-card);border-radius:10px;box-shadow:var(--shadow-sm);'
-            f'border-left:3px solid {cor};margin-bottom:8px;overflow:hidden">'
-            # Linha principal: posicao + nome + volume atual
-            '<div style="display:flex;align-items:center;gap:14px;padding:11px 14px">'
-            f'<div style="font-size:1.4rem;width:32px;text-align:center">{pos}</div>'
-            f'<div style="flex:1"><div style="font-weight:700;color:var(--text);font-size:0.92rem">{label}</div>'
-            f'<div style="font-size:0.7rem;color:var(--text-muted)">{r["qtd"]} vendas <span style="color:var(--text-muted);margin:0 4px">·</span> {r["unidade"]}</div></div>'
-            f'<div style="text-align:right"><div style="font-weight:800;color:{cor};font-size:1.05rem;font-feature-settings:\'tnum\'">{r["volume_atual_fmt"]}</div>'
-            '<div style="font-size:0.58rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;font-weight:600">Realizado</div></div>'
+            '<div style="background:var(--bg-card);border-radius:12px;box-shadow:var(--shadow-md);'
+            f'border-left:4px solid {cor};margin-bottom:10px;overflow:hidden">'
+            # Header: posicao + nome
+            '<div style="display:flex;align-items:center;gap:14px;padding:12px 16px 8px 16px">'
+            f'<div style="font-size:1.5rem;width:36px;text-align:center">{pos}</div>'
+            f'<div style="flex:1"><div style="font-weight:700;color:var(--text);font-size:1rem;letter-spacing:-0.2px">{label}</div>'
+            f'<div style="font-size:0.7rem;color:var(--text-muted);margin-top:1px">{r["qtd"]} vendas realizadas · unidade {r["unidade"]}</div></div>'
             '</div>'
-            # Sub-linha: forecast
-            f'<div style="display:flex;align-items:center;gap:14px;padding:8px 14px;background:linear-gradient(90deg,{cor}08,transparent);border-top:1px dashed var(--border);font-size:0.72rem">'
-            f'<div style="width:32px;text-align:center;color:var(--text-muted)">{icon("chart",12,"var(--text-muted)")}</div>'
-            '<div style="flex:1;color:var(--text-secondary)">'
-            f'<span style="color:var(--text-muted);font-weight:600">Projeção fim do mês:</span> '
-            f'<span style="font-weight:700;color:var(--text);font-feature-settings:\'tnum\'">{r["forecast_qtd"]} vendas · {r["forecast_vol_fmt"]}</span>'
+            # Grid 2 colunas: REALIZADO | PROJETADO
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--border)">'
+            # REALIZADO
+            f'<div style="padding:14px 16px;background:{cor}08;border-right:1px solid var(--border)">'
+            f'<div style="font-size:0.6rem;color:{cor};text-transform:uppercase;font-weight:700;letter-spacing:0.6px;margin-bottom:6px;display:flex;align-items:center;gap:5px">'
+            f'{icon("target",11,cor)} Realizado · {du_h}/{du_t} DU</div>'
+            f'<div style="font-size:1.5rem;font-weight:800;color:{cor};line-height:1;font-feature-settings:\'tnum\';letter-spacing:-0.5px">{r["volume_atual_fmt"]}</div>'
+            f'<div style="font-size:0.7rem;color:var(--text-muted);margin-top:5px">{r["qtd"]} vendas no mês</div>'
             '</div>'
-            '<div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:2px">'
-            f'<div style="display:flex;align-items:center;gap:4px"><span style="color:var(--text-muted);font-size:0.6rem">vs anterior:</span> {_vbadge(r["var_vol_pct"])}</div>'
-            f'<div style="font-size:0.58rem;color:var(--text-muted)">{MESES_PT_FULL.get(m_a,"")}: {r["qtd_anterior"]} · {r["volume_anterior_fmt"]}</div>'
+            # PROJETADO (destaque diferente — cor roxa, fonte serif italica)
+            f'<div style="padding:14px 16px;background:{FC_COLOR_BG};position:relative">'
+            f'<div style="font-size:0.6rem;color:{FC_COLOR};text-transform:uppercase;font-weight:700;letter-spacing:0.6px;margin-bottom:6px;display:flex;align-items:center;gap:5px">'
+            f'{icon("trending-up",11,FC_COLOR)} Projeção fim do mês</div>'
+            f'<div style="font-size:1.5rem;font-weight:800;color:{FC_COLOR};line-height:1;font-feature-settings:\'tnum\';letter-spacing:-0.5px;'
+            f'font-style:italic;font-family:\'Georgia\',\'Times New Roman\',serif">{r["forecast_vol_fmt"]}</div>'
+            f'<div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap">'
+            f'<span style="font-size:0.7rem;color:var(--text-secondary);font-feature-settings:\'tnum\'">{r["forecast_qtd"]} vendas projetadas</span>'
+            f'{_vbadge(r["var_vol_pct"])}'
             '</div>'
+            f'{note_html}'
+            '</div>'
+            '</div>'
+            # Footer: comparativo mes anterior
+            f'<div style="padding:7px 16px;background:var(--bg-overlay);border-top:1px solid var(--border);'
+            f'font-size:0.62rem;color:var(--text-muted);text-align:right">'
+            f'{MESES_PT_FULL.get(m_a,"")} (real): {r["qtd_anterior"]} vendas · {r["volume_anterior_fmt"]}'
             '</div>'
             '</div>'
         )
