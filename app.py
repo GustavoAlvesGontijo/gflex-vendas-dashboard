@@ -140,66 +140,121 @@ try:
         df_g = get_opps_ganhas_mensal_por_empresa()
         df_kwh = get_energy_kwh_mensal()
 
+    # Mes atual e mes anterior
+    m_a = m - 1 if m > 1 else 12
+    a_a = a if m > 1 else a - 1
+    du_anterior_total = dias_uteis_no_mes(a_a, m_a)
+
     cur_g = df_g[(df_g['ano']==a) & (df_g['mes']==m)] if not df_g.empty else df_g
+    ant_g = df_g[(df_g['ano']==a_a) & (df_g['mes']==m_a)] if not df_g.empty else df_g
     cur_k = df_kwh[(df_kwh['ano']==a) & (df_kwh['mes']==m)] if not df_kwh.empty else df_kwh
+    ant_k = df_kwh[(df_kwh['ano']==a_a) & (df_kwh['mes']==m_a)] if not df_kwh.empty else df_kwh
     energy_kwh_mes = float(cur_k['total_kwh'].sum()) if not cur_k.empty else 0
+    energy_kwh_ant = float(ant_k['total_kwh'].sum()) if not ant_k.empty else 0
+
+    # mapas mes anterior por empresa
+    ant_qtd = {}; ant_val = {}
+    if not ant_g.empty:
+        for _, r in ant_g.iterrows():
+            ant_qtd[r['Empresa_Proprietaria__c']] = int(r['total'])
+            ant_val[r['Empresa_Proprietaria__c']] = float(r['valor'])
 
     # ========================================
-    # RANKING DE TODAS EMPRESAS POR VENDAS NO MES
-    # Energy: ordena/exibe por kWh; demais: por R$
-    # Ranking unificado por QTD de vendas (universal); volume varia
+    # RANKING DE TODAS EMPRESAS POR VENDAS NO MES + FORECAST
+    # Forecast: rate atual (qtd/DU_decorrido) * DU_total_mes
+    # Variacao: (projecao - mes_anterior) / mes_anterior
     # ========================================
     rank_data = []
-    if not cur_g.empty:
-        rank_g = cur_g.groupby('Empresa_Proprietaria__c').agg({'total':'sum','valor':'sum'}).reset_index()
-        for _, r in rank_g.iterrows():
-            emp = r['Empresa_Proprietaria__c']
-            qtd = int(r['total']); val = float(r['valor'])
-            is_energy = (emp == "Flex Energy")
-            volume = energy_kwh_mes if is_energy else val
-            volume_fmt = _fk(energy_kwh_mes) if is_energy else _fv(val)
-            unidade = "kWh" if is_energy else "R$"
-            rank_data.append({
-                "empresa": emp, "qtd": qtd, "valor": val,
-                "volume": volume, "volume_fmt": volume_fmt, "unidade": unidade,
-                "is_energy": is_energy,
-            })
-    # Garantir todas 6 empresas (mesmo zero)
-    presentes = {r['empresa'] for r in rank_data}
-    for emp in EMPRESAS:
-        if emp not in presentes:
-            is_energy = (emp == "Flex Energy")
-            rank_data.append({
-                "empresa": emp, "qtd": 0, "valor": 0.0,
-                "volume": 0, "volume_fmt": ("0 kWh" if is_energy else "R$ 0"),
-                "unidade": ("kWh" if is_energy else "R$"),
-                "is_energy": is_energy,
-            })
-    # Ordena por qtd (universal) — desempata por valor/volume
-    rank_data.sort(key=lambda x: (-x['qtd'], -x['volume']))
+    rank_g = cur_g.groupby('Empresa_Proprietaria__c').agg({'total':'sum','valor':'sum'}).reset_index() if not cur_g.empty else pd.DataFrame()
+    cur_g_map = {r['Empresa_Proprietaria__c']: (int(r['total']), float(r['valor'])) for _, r in rank_g.iterrows()}
 
-    medals = ["\U0001f947", "\U0001f948", "\U0001f949"]  # 🥇 🥈 🥉
+    for emp in EMPRESAS:
+        is_energy = (emp == "Flex Energy")
+        qtd, val = cur_g_map.get(emp, (0, 0.0))
+        volume_atual = energy_kwh_mes if is_energy else val
+        volume_anterior = energy_kwh_ant if is_energy else ant_val.get(emp, 0.0)
+        qtd_anterior = ant_qtd.get(emp, 0)
+
+        # Forecast (so faz sentido se ja passou pelo menos 1 DU)
+        if du_h > 0 and du_t > 0:
+            rate_qtd = qtd / du_h
+            forecast_qtd = round(rate_qtd * du_t)
+            rate_vol = volume_atual / du_h
+            forecast_vol = rate_vol * du_t
+        else:
+            forecast_qtd = qtd
+            forecast_vol = volume_atual
+
+        # Variacao da projecao vs total mes anterior
+        var_qtd_pct = ((forecast_qtd - qtd_anterior) / qtd_anterior * 100) if qtd_anterior > 0 else None
+        var_vol_pct = ((forecast_vol - volume_anterior) / volume_anterior * 100) if volume_anterior > 0 else None
+
+        rank_data.append({
+            "empresa": emp, "qtd": qtd, "valor": val,
+            "volume_atual": volume_atual,
+            "volume_atual_fmt": _fk(energy_kwh_mes) if is_energy else _fv(val),
+            "unidade": "kWh" if is_energy else "R$",
+            "forecast_qtd": int(forecast_qtd),
+            "forecast_vol_fmt": _fk(forecast_vol) if is_energy else _fv(forecast_vol),
+            "qtd_anterior": qtd_anterior,
+            "volume_anterior_fmt": _fk(volume_anterior) if is_energy else _fv(volume_anterior),
+            "var_qtd_pct": var_qtd_pct,
+            "var_vol_pct": var_vol_pct,
+            "is_energy": is_energy,
+        })
+
+    # Ordena por qtd (universal); desempata por volume
+    rank_data.sort(key=lambda x: (-x['qtd'], -x['volume_atual']))
+
+    def _vbadge(p):
+        if p is None: return '<span style="color:var(--text-muted);font-size:0.65rem">—</span>'
+        pos = p > 0
+        col = "#059669" if pos else "#dc2626"
+        bg = "#10b98118" if pos else "#dc262618"
+        arrow = "↑" if pos else "↓"
+        sign = "+" if pos else ""
+        return (
+            f'<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;'
+            f'border-radius:5px;background:{bg};color:{col};font-size:0.62rem;font-weight:700;'
+            f'font-feature-settings:\'tnum\'">{arrow} {sign}{p:.0f}%</span>'
+        )
+
+    medals = ["\U0001f947", "\U0001f948", "\U0001f949"]
     rows_html = ""
     for i, r in enumerate(rank_data):
         cor = CORES.get(r['empresa'], {}).get("primaria", "#999")
         label = EMPRESA_LABELS.get(r['empresa'], r['empresa'])
         pos = medals[i] if i < 3 else f'<span style="color:var(--text-muted);font-weight:700;font-size:0.9rem">#{i+1}</span>'
         rows_html += (
-            '<div style="display:flex;align-items:center;gap:14px;padding:11px 14px;background:var(--bg-card);border-radius:10px;'
-            'box-shadow:var(--shadow-sm);border-left:3px solid '+cor+';margin-bottom:7px">'
+            '<div style="background:var(--bg-card);border-radius:10px;box-shadow:var(--shadow-sm);'
+            f'border-left:3px solid {cor};margin-bottom:8px;overflow:hidden">'
+            # Linha principal: posicao + nome + volume atual
+            '<div style="display:flex;align-items:center;gap:14px;padding:11px 14px">'
             f'<div style="font-size:1.4rem;width:32px;text-align:center">{pos}</div>'
             f'<div style="flex:1"><div style="font-weight:700;color:var(--text);font-size:0.92rem">{label}</div>'
-            f'<div style="font-size:0.7rem;color:var(--text-muted)">{r["qtd"]} vendas</div></div>'
-            f'<div style="text-align:right">'
-            f'<div style="font-weight:800;color:{cor};font-size:1.05rem;font-feature-settings:\'tnum\'">{r["volume_fmt"]}</div>'
-            f'<div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;font-weight:600">{r["unidade"]}</div>'
+            f'<div style="font-size:0.7rem;color:var(--text-muted)">{r["qtd"]} vendas <span style="color:var(--text-muted);margin:0 4px">·</span> {r["unidade"]}</div></div>'
+            f'<div style="text-align:right"><div style="font-weight:800;color:{cor};font-size:1.05rem;font-feature-settings:\'tnum\'">{r["volume_atual_fmt"]}</div>'
+            '<div style="font-size:0.58rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;font-weight:600">Realizado</div></div>'
+            '</div>'
+            # Sub-linha: forecast
+            f'<div style="display:flex;align-items:center;gap:14px;padding:8px 14px;background:linear-gradient(90deg,{cor}08,transparent);border-top:1px dashed var(--border);font-size:0.72rem">'
+            f'<div style="width:32px;text-align:center;color:var(--text-muted)">{icon("chart",12,"var(--text-muted)")}</div>'
+            '<div style="flex:1;color:var(--text-secondary)">'
+            f'<span style="color:var(--text-muted);font-weight:600">Projeção fim do mês:</span> '
+            f'<span style="font-weight:700;color:var(--text);font-feature-settings:\'tnum\'">{r["forecast_qtd"]} vendas · {r["forecast_vol_fmt"]}</span>'
+            '</div>'
+            '<div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:2px">'
+            f'<div style="display:flex;align-items:center;gap:4px"><span style="color:var(--text-muted);font-size:0.6rem">vs anterior:</span> {_vbadge(r["var_vol_pct"])}</div>'
+            f'<div style="font-size:0.58rem;color:var(--text-muted)">{MESES_PT_FULL.get(m_a,"")}: {r["qtd_anterior"]} · {r["volume_anterior_fmt"]}</div>'
+            '</div>'
             '</div>'
             '</div>'
         )
+
     st.markdown(
         '<h3 class="gx-h3" style="display:flex;align-items:center;gap:8px">'
-        f'{icon("chart",18,"var(--accent)")} RANKING DO MES</h3>'
-        '<p class="gx-subtle">Ordenado por <b>quantidade de vendas</b> em '+MESES_PT_FULL.get(m,'')+f' {a} · Flex Energy em kWh, demais em R$</p>'
+        f'{icon("chart",18,"var(--accent)")} RANKING + FORECAST DO MES</h3>'
+        f'<p class="gx-subtle">Ordenado por <b>vendas em {MESES_PT_FULL.get(m,"")} {a}</b> ({du_h}/{du_t} DU) · Projeção pro fim do mês baseada no rate atual · Flex Energy em kWh</p>'
         f'{rows_html}',
         unsafe_allow_html=True,
     )
