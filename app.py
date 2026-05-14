@@ -134,87 +134,77 @@ def _fk(v):
 
 try:
     from salesforce_client import (
-        get_leads_mensal_por_empresa, get_opps_mensal_por_empresa,
         get_opps_ganhas_mensal_por_empresa, get_energy_kwh_mensal,
     )
-    with st.spinner("Carregando indicadores do mes..."):
-        df_l = get_leads_mensal_por_empresa()
-        df_o = get_opps_mensal_por_empresa()
+    with st.spinner("Carregando ranking do mes..."):
         df_g = get_opps_ganhas_mensal_por_empresa()
         df_kwh = get_energy_kwh_mensal()
 
-    cur_l = df_l[(df_l['ano']==a) & (df_l['mes']==m)] if not df_l.empty else df_l
-    cur_o = df_o[(df_o['ano']==a) & (df_o['mes']==m)] if not df_o.empty else df_o
     cur_g = df_g[(df_g['ano']==a) & (df_g['mes']==m)] if not df_g.empty else df_g
     cur_k = df_kwh[(df_kwh['ano']==a) & (df_kwh['mes']==m)] if not df_kwh.empty else df_kwh
+    energy_kwh_mes = float(cur_k['total_kwh'].sum()) if not cur_k.empty else 0
 
-    total_leads = int(cur_l['total'].sum()) if not cur_l.empty else 0
-    total_orc = int(cur_o['total'].sum()) if not cur_o.empty else 0
-    total_vendas = int(cur_g['total'].sum()) if not cur_g.empty else 0
-    total_valor = float(cur_g['valor'].sum()) if not cur_g.empty else 0
-    total_kwh = float(cur_k['total_kwh'].sum()) if not cur_k.empty else 0
+    # ========================================
+    # RANKING DE TODAS EMPRESAS POR VENDAS NO MES
+    # Energy: ordena/exibe por kWh; demais: por R$
+    # Ranking unificado por QTD de vendas (universal); volume varia
+    # ========================================
+    rank_data = []
+    if not cur_g.empty:
+        rank_g = cur_g.groupby('Empresa_Proprietaria__c').agg({'total':'sum','valor':'sum'}).reset_index()
+        for _, r in rank_g.iterrows():
+            emp = r['Empresa_Proprietaria__c']
+            qtd = int(r['total']); val = float(r['valor'])
+            is_energy = (emp == "Flex Energy")
+            volume = energy_kwh_mes if is_energy else val
+            volume_fmt = _fk(energy_kwh_mes) if is_energy else _fv(val)
+            unidade = "kWh" if is_energy else "R$"
+            rank_data.append({
+                "empresa": emp, "qtd": qtd, "valor": val,
+                "volume": volume, "volume_fmt": volume_fmt, "unidade": unidade,
+                "is_energy": is_energy,
+            })
+    # Garantir todas 6 empresas (mesmo zero)
+    presentes = {r['empresa'] for r in rank_data}
+    for emp in EMPRESAS:
+        if emp not in presentes:
+            is_energy = (emp == "Flex Energy")
+            rank_data.append({
+                "empresa": emp, "qtd": 0, "valor": 0.0,
+                "volume": 0, "volume_fmt": ("0 kWh" if is_energy else "R$ 0"),
+                "unidade": ("kWh" if is_energy else "R$"),
+                "is_energy": is_energy,
+            })
+    # Ordena por qtd (universal) — desempata por valor/volume
+    rank_data.sort(key=lambda x: (-x['qtd'], -x['volume']))
 
-    # 4 KPIs consolidados em grid
+    medals = ["\U0001f947", "\U0001f948", "\U0001f949"]  # 🥇 🥈 🥉
+    rows_html = ""
+    for i, r in enumerate(rank_data):
+        cor = CORES.get(r['empresa'], {}).get("primaria", "#999")
+        label = EMPRESA_LABELS.get(r['empresa'], r['empresa'])
+        pos = medals[i] if i < 3 else f'<span style="color:var(--text-muted);font-weight:700;font-size:0.9rem">#{i+1}</span>'
+        rows_html += (
+            '<div style="display:flex;align-items:center;gap:14px;padding:11px 14px;background:var(--bg-card);border-radius:10px;'
+            'box-shadow:var(--shadow-sm);border-left:3px solid '+cor+';margin-bottom:7px">'
+            f'<div style="font-size:1.4rem;width:32px;text-align:center">{pos}</div>'
+            f'<div style="flex:1"><div style="font-weight:700;color:var(--text);font-size:0.92rem">{label}</div>'
+            f'<div style="font-size:0.7rem;color:var(--text-muted)">{r["qtd"]} vendas</div></div>'
+            f'<div style="text-align:right">'
+            f'<div style="font-weight:800;color:{cor};font-size:1.05rem;font-feature-settings:\'tnum\'">{r["volume_fmt"]}</div>'
+            f'<div style="font-size:0.6rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;font-weight:600">{r["unidade"]}</div>'
+            '</div>'
+            '</div>'
+        )
     st.markdown(
-        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px">'
-        # Leads
-        '<div class="gx-card" style="background:#3b82f60a;border-left:4px solid #3b82f6">'
-        f'<div style="display:flex;align-items:center;gap:6px;font-size:0.65rem;color:#1d4ed8;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">{icon("users",13,"#1d4ed8")} Leads no Mes</div>'
-        f'<div style="font-size:1.9rem;font-weight:800;color:var(--text);font-feature-settings:\'tnum\';line-height:1">{_fmt(total_leads)}</div>'
-        '<div style="font-size:0.65rem;color:var(--text-muted);margin-top:6px">Todas as 6 empresas</div>'
-        '</div>'
-        # Orcamentos
-        '<div class="gx-card" style="background:#8b5cf60a;border-left:4px solid #8b5cf6">'
-        f'<div style="display:flex;align-items:center;gap:6px;font-size:0.65rem;color:#6d28d9;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">{icon("file-text",13,"#6d28d9")} Orcamentos</div>'
-        f'<div style="font-size:1.9rem;font-weight:800;color:var(--text);font-feature-settings:\'tnum\';line-height:1">{_fmt(total_orc)}</div>'
-        '<div style="font-size:0.65rem;color:var(--text-muted);margin-top:6px">Opps criadas no mes</div>'
-        '</div>'
-        # Vendas
-        '<div class="gx-card" style="background:#10b9810a;border-left:4px solid #10b981">'
-        f'<div style="display:flex;align-items:center;gap:6px;font-size:0.65rem;color:#047857;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">{icon("target",13,"#047857")} Vendas</div>'
-        f'<div style="font-size:1.9rem;font-weight:800;color:var(--text);font-feature-settings:\'tnum\';line-height:1">{_fmt(total_vendas)}</div>'
-        f'<div style="font-size:0.65rem;color:var(--text-muted);margin-top:6px">Fechado Ganho · {_fv(total_valor)}</div>'
-        '</div>'
-        # Energia (Flex Energy)
-        '<div class="gx-card" style="background:#EC85000a;border-left:4px solid #EC8500">'
-        f'<div style="display:flex;align-items:center;gap:6px;font-size:0.65rem;color:#B45309;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">{icon("scale",13,"#B45309")} Energia Vendida</div>'
-        f'<div style="font-size:1.9rem;font-weight:800;color:var(--text);font-feature-settings:\'tnum\';line-height:1">{_fk(total_kwh)}</div>'
-        '<div style="font-size:0.65rem;color:var(--text-muted);margin-top:6px">Flex Energy (kWh)</div>'
-        '</div>'
-        '</div>',
+        '<h3 class="gx-h3" style="display:flex;align-items:center;gap:8px">'
+        f'{icon("chart",18,"var(--accent)")} RANKING DO MES</h3>'
+        '<p class="gx-subtle">Ordenado por <b>quantidade de vendas</b> em '+MESES_PT_FULL.get(m,'')+f' {a} · Flex Energy em kWh, demais em R$</p>'
+        f'{rows_html}',
         unsafe_allow_html=True,
     )
-
-    # ========================================
-    # RANKING TOP 3 EMPRESAS POR VENDAS NO MES
-    # ========================================
-    if not cur_g.empty:
-        rank = cur_g.groupby('Empresa_Proprietaria__c').agg({'total':'sum','valor':'sum'}).sort_values('valor', ascending=False).head(3)
-        if not rank.empty:
-            medals = ["\U0001f947", "\U0001f948", "\U0001f949"]  # 🥇 🥈 🥉
-            rows_html = ""
-            for i, (emp, r) in enumerate(rank.iterrows()):
-                cor = CORES.get(emp, {}).get("primaria", "#999")
-                label = EMPRESA_LABELS.get(emp, emp)
-                qtd = int(r['total']); val = float(r['valor'])
-                rows_html += (
-                    '<div style="display:flex;align-items:center;gap:14px;padding:11px 14px;background:var(--bg-card);border-radius:10px;'
-                    'box-shadow:var(--shadow-sm);border-left:3px solid '+cor+';margin-bottom:7px">'
-                    f'<div style="font-size:1.4rem">{medals[i]}</div>'
-                    f'<div style="flex:1"><div style="font-weight:700;color:var(--text);font-size:0.92rem">{label}</div>'
-                    f'<div style="font-size:0.7rem;color:var(--text-muted)">{qtd} vendas</div></div>'
-                    f'<div style="font-weight:800;color:{cor};font-size:1.05rem;font-feature-settings:\'tnum\'">{_fv(val)}</div>'
-                    '</div>'
-                )
-            st.markdown(
-                '<h3 class="gx-h3" style="display:flex;align-items:center;gap:8px">'
-                f'{icon("chart",18,"var(--accent)")} TOP EMPRESAS NO MES</h3>'
-                '<p class="gx-subtle">Ranking por valor de vendas em '+MESES_PT_FULL.get(m,'')+f' {a}</p>'
-                f'{rows_html}',
-                unsafe_allow_html=True,
-            )
 except Exception as e:
-    st.warning(f"Indicadores indisponiveis no momento ({str(e)[:80]}). Acesse uma secao para ver detalhes.")
+    st.warning(f"Ranking indisponivel no momento ({str(e)[:80]}). Acesse uma secao para ver detalhes.")
 
 # ========================================
 # CARDS DE NAVEGACAO
