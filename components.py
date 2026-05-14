@@ -158,14 +158,20 @@ def card_close() -> str:
 # Sub-linha split (Licitação vs Outras) — usado nos cards Flex Tendas
 # ============================================================
 
-def split_lines(label_a: str, val_a: str, label_b: str, val_b: str, show: bool = True) -> str:
-    """Duas linhas pequenas com cores diferentes. show=False -> ''."""
+def split_lines(
+    label_a: str, val_a: str,
+    label_b: str, val_b: str,
+    show: bool = True,
+    color_a: str = "#B45309",
+    color_b: str = "var(--text-muted)",
+) -> str:
+    """Duas sub-linhas com labels e cores configuraveis. show=False -> ''."""
     if not show:
         return ""
     return (
         '<div style="margin-top:5px;line-height:1.4;font-size:0.6rem;font-weight:600">'
-        f'<div style="color:#B45309">{label_a}: {val_a}</div>'
-        f'<div style="color:var(--text-muted)">{label_b}: {val_b}</div>'
+        f'<div style="color:{color_a}">{label_a}: {val_a}</div>'
+        f'<div style="color:{color_b}">{label_b}: {val_b}</div>'
         '</div>'
     )
 

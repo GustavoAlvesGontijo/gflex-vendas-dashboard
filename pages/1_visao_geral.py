@@ -125,17 +125,27 @@ try:
     energy_pipe_kwh_total = sum(energy_pipe_kwh.values())
     energy_pipe_kwh_neg = sum(v for k, v in energy_pipe_kwh.items() if k in ["Negociação", "Contrato"])
 
-    # Pipeline aberto por empresa — negociacao/contrato vs total
-    pipe_neg, pipe_neg_val, pipe_total, pipe_total_val = {}, {}, {}, {}
+    # Pipeline aberto por empresa — separar Negociacao e Contrato (alem do total)
+    pipe_neg, pipe_neg_val = {}, {}        # soma Negociacao + Contrato (quente)
+    pipe_negociacao_q, pipe_negociacao_v = {}, {}   # so Negociacao
+    pipe_contrato_q, pipe_contrato_v = {}, {}       # so Contrato
+    pipe_total, pipe_total_val = {}, {}
     if not df_pipe.empty:
-        fases_neg = ["Negociação", "Contrato"]
         for _, r in df_pipe.iterrows():
             e = r.get("Empresa_Proprietaria__c","")
+            stage = r["StageName"]
             qtd = int(r["total"])
             val = float(r["valor"]) if (r["valor"] is not None and not pd.isna(r["valor"])) else 0
             pipe_total[e] = pipe_total.get(e,0) + qtd
             pipe_total_val[e] = pipe_total_val.get(e,0) + val
-            if r["StageName"] in fases_neg:
+            if stage == "Negociação":
+                pipe_negociacao_q[e] = pipe_negociacao_q.get(e,0) + qtd
+                pipe_negociacao_v[e] = pipe_negociacao_v.get(e,0) + val
+                pipe_neg[e] = pipe_neg.get(e,0) + qtd
+                pipe_neg_val[e] = pipe_neg_val.get(e,0) + val
+            elif stage == "Contrato":
+                pipe_contrato_q[e] = pipe_contrato_q.get(e,0) + qtd
+                pipe_contrato_v[e] = pipe_contrato_v.get(e,0) + val
                 pipe_neg[e] = pipe_neg.get(e,0) + qtd
                 pipe_neg_val[e] = pipe_neg_val.get(e,0) + val
 
@@ -177,16 +187,27 @@ try:
         pn = pipe_neg.get(emp, 0); pnv = pipe_neg_val.get(emp, 0)
         pt = pipe_total.get(emp, 0); ptv = pipe_total_val.get(emp, 0)
 
+        # Split Negociacao vs Contrato (qtd e valor)
+        neg_q = pipe_negociacao_q.get(emp, 0); neg_v = pipe_negociacao_v.get(emp, 0)
+        ctr_q = pipe_contrato_q.get(emp, 0);   ctr_v = pipe_contrato_v.get(emp, 0)
+
         # Volume vendido + pipeline (Energy em kWh; demais R$)
         if ie:
             kh = kwh_m.get((a,m),0); kh_a = kwh_m.get((a_a,m_a),0)
             vol = _fk(kh); vol_lab = "Energia"
             v_vol_pct = _var_pct(kh, du_h, kh_a, du_ant)
             neg_vol = _fk(energy_pipe_kwh_neg); pipe_vol = _fk(energy_pipe_kwh_total)
+            # Energy: usar kWh diretos por fase
+            neg_v_show = energy_pipe_kwh.get("Negociação", 0)
+            ctr_v_show = energy_pipe_kwh.get("Contrato", 0)
+            fmt_split = _fk
         else:
             vol = _fv(gv); vol_lab = "Valor"
             v_vol_pct = _var_pct(gv, du_h, gv_a, du_ant)
             neg_vol = _fv(pnv); pipe_vol = _fv(ptv)
+            neg_v_show = neg_v
+            ctr_v_show = ctr_v
+            fmt_split = _fv
 
         v_gq_pct = _var_pct(gq, du_h, gq_a, du_ant)
         v_lq_pct = _var_pct(lq, du_h, lq_a, du_ant)
@@ -204,14 +225,29 @@ try:
         out_l_q = max(0, lq - lic_l_q)
         out_orc_q = max(0, oq - lic_o_q)
 
+        # Splits Licitacao/Outras (so Flex Tendas) — mantidos em Vendido / Pipeline / Leads / Orcamentos
         sp_vend_qtd = split_lines("⚖ Licit.", _fmt(lic_v_q), "Outras", _fmt(out_v_q), is_tendas)
         sp_vend_val = split_lines("⚖ Licit.", _fv(lic_v_v), "Outras", _fv(out_v_v), is_tendas)
-        sp_neg_qtd = split_lines("⚖ Licit.", _fmt(lic_neg_q), "Outras", _fmt(out_neg_q), is_tendas)
-        sp_neg_val = split_lines("⚖ Licit.", _fv(lic_neg_v), "Outras", _fv(out_neg_v), is_tendas)
         sp_pipe_qtd = split_lines("⚖ Licit.", _fmt(lic_pipe_q), "Outras", _fmt(out_pipe_q), is_tendas)
         sp_pipe_val = split_lines("⚖ Licit.", _fv(lic_pipe_v), "Outras", _fv(out_pipe_v), is_tendas)
         sp_lead = split_lines("⚖ Licit.", _fmt(lic_l_q), "Outras", _fmt(out_l_q), is_tendas)
         sp_orc = split_lines("⚖ Licit.", _fmt(lic_o_q), "Outras", _fmt(out_orc_q), is_tendas)
+
+        # Split Negociacao vs Contrato — em TODAS as empresas, dentro do card Neg+Contrato
+        sp_neg_qtd = split_lines(
+            "Negociação", _fmt(neg_q),
+            "Contrato",   _fmt(ctr_q),
+            show=True,
+            color_a="#E65100",
+            color_b="#9A3412",
+        )
+        sp_neg_val = split_lines(
+            "Negociação", fmt_split(neg_v_show),
+            "Contrato",   fmt_split(ctr_v_show),
+            show=True,
+            color_a="#E65100",
+            color_b="#9A3412",
+        )
 
         # Badge no header — só Flex Tendas
         lic_badge = (
