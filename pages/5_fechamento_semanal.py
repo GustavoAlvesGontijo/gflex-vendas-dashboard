@@ -493,18 +493,27 @@ if empresa == "Flex Energy":
 
 if not df_leads_vend.empty:
     df_v = df_leads_vend.copy()
-    # df_leads_vend tem Owner.Name, Status, IsConverted, total
+    # df_leads_vend tem vendedor (alias de Owner.Name), Status, IsConverted, total
+    # Fallback se a coluna nao existir com alias
+    if "vendedor" not in df_v.columns:
+        for cand in ["Owner.Name", "Name", "expr0"]:
+            if cand in df_v.columns:
+                df_v = df_v.rename(columns={cand: "vendedor"})
+                break
+        else:
+            df_v["vendedor"] = "—"
+    df_v["vendedor"] = df_v["vendedor"].fillna("(sem proprietario)")
     df_v["recebidos"] = df_v["total"]
     df_v["tratados"] = df_v.apply(lambda r: r["total"] if r.get("Status") and r.get("Status") != "Aberto" else 0, axis=1)
     df_v["convertidos"] = df_v.apply(lambda r: r["total"] if r.get("IsConverted") else 0, axis=1)
-    agg = df_v.groupby("Owner.Name", as_index=False).agg({
+    agg = df_v.groupby("vendedor", as_index=False).agg({
         "recebidos": "sum", "tratados": "sum", "convertidos": "sum"
     })
     agg = agg.sort_values("recebidos", ascending=False).head(20)
     agg["% Tratativa"] = agg.apply(lambda r: f"{r['tratados']/r['recebidos']*100:.0f}%" if r["recebidos"] > 0 else "—", axis=1)
     agg["% Conversao"] = agg.apply(lambda r: f"{r['convertidos']/r['recebidos']*100:.0f}%" if r["recebidos"] > 0 else "—", axis=1)
     agg = agg.rename(columns={
-        "Owner.Name": "Vendedor",
+        "vendedor": "Vendedor",
         "recebidos": "Leads recebidos",
         "tratados": "Tratados",
         "convertidos": "Convertidos p/ Conta",
@@ -520,9 +529,17 @@ if empresa == "Flex Energy":
     st.markdown('<div style="font-size:0.72rem;color:var(--text-muted);font-style:italic;margin-bottom:10px">Volume em kWh eh a medida primaria. Ticket medio considerado como <b>acumulado mensal (MTD)</b>.</div>', unsafe_allow_html=True)
     if not df_consumo_decl.empty:
         df_kc = df_consumo_decl.copy()
+        # Fallback se alias vendedor nao veio
+        if "vendedor" not in df_kc.columns:
+            for cand in ["Owner.Name", "Name", "expr0"]:
+                if cand in df_kc.columns:
+                    df_kc = df_kc.rename(columns={cand: "vendedor"})
+                    break
+            else:
+                df_kc["vendedor"] = "—"
         df_kc["consumo_medio"] = df_kc.apply(lambda r: r["total_kwh"] / r["total_leads"] if r["total_leads"] > 0 else 0, axis=1)
         df_kc = df_kc.rename(columns={
-            "Owner.Name": "Vendedor",
+            "vendedor": "Vendedor",
             "total_leads": "Leads na semana",
             "total_kwh": "Consumo total (kWh)",
             "consumo_medio": "Consumo medio/lead (kWh)",
@@ -635,13 +652,22 @@ if empresa == "Flex Energy":
     st.markdown(f'<div style="font-family:ui-monospace,monospace;font-size:10px;color:{cor_emp};text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">↳ Flex Energy: discriminar por Interno / Externo / Representantes / Media Tensao · medida primaria em <b>kWh</b></div>', unsafe_allow_html=True)
 if not df_opps_sem.empty:
     df_p = df_opps_sem.copy()
-    agg_p = df_p.groupby("Owner.Name", as_index=False).agg({"total": "sum", "valor": "sum"})
+    # Fallback se alias vendedor nao veio
+    if "vendedor" not in df_p.columns:
+        for cand in ["Owner.Name", "Name", "expr0"]:
+            if cand in df_p.columns:
+                df_p = df_p.rename(columns={cand: "vendedor"})
+                break
+        else:
+            df_p["vendedor"] = "—"
+    df_p["vendedor"] = df_p["vendedor"].fillna("(sem proprietario)")
+    agg_p = df_p.groupby("vendedor", as_index=False).agg({"total": "sum", "valor": "sum"})
     # Fase predominante por vendedor
-    fase_pred = df_p.sort_values("total", ascending=False).groupby("Owner.Name")["StageName"].first().to_dict()
-    agg_p["Fase predominante"] = agg_p["Owner.Name"].map(fase_pred)
+    fase_pred = df_p.sort_values("total", ascending=False).groupby("vendedor")["StageName"].first().to_dict()
+    agg_p["Fase predominante"] = agg_p["vendedor"].map(fase_pred)
     agg_p["Ticket medio"] = agg_p.apply(lambda r: f"R$ {r['valor']/r['total']:,.0f}".replace(",", ".") if r["total"] > 0 and r["valor"] else "—", axis=1)
     agg_p = agg_p.sort_values("total", ascending=False).head(20)
-    agg_p = agg_p.rename(columns={"Owner.Name": "Vendedor", "total": "Orcamentos criados", "valor": "Volume R$"})
+    agg_p = agg_p.rename(columns={"vendedor": "Vendedor", "total": "Orcamentos criados", "valor": "Volume R$"})
     agg_p["Volume R$"] = agg_p["Volume R$"].apply(_fv)
     st.dataframe(agg_p[["Vendedor", "Orcamentos criados", "Volume R$", "Ticket medio", "Fase predominante"]],
                  hide_index=True, use_container_width=True)

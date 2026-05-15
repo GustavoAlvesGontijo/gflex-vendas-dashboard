@@ -857,9 +857,11 @@ def get_leads_status_periodo(empresa: str, data_inicio: date, data_fim: date) ->
 
 @st.cache_data(ttl=CACHE_TTL_SECONDS)
 def get_leads_vendedor_periodo(empresa: str, data_inicio: date, data_fim: date) -> pd.DataFrame:
-    """Leads por proprietario com IsConverted no periodo (para tabela de vendedores)."""
+    """Leads por proprietario com IsConverted no periodo (para tabela de vendedores).
+    Usa alias 'vendedor' porque SF aggregate queries achatam Owner.Name de forma inconsistente.
+    """
     soql = f"""
-        SELECT Owner.Name, Status, IsConverted, COUNT(Id) total
+        SELECT Owner.Name vendedor, Status, IsConverted, COUNT(Id) total
         FROM Lead
         WHERE Empresa_Proprietaria__c = '{empresa}'
         AND CreatedDate >= {_format_date(data_inicio)}
@@ -874,7 +876,7 @@ def get_leads_vendedor_periodo(empresa: str, data_inicio: date, data_fim: date) 
 def get_energy_consumo_declarado_periodo(data_inicio: date, data_fim: date) -> pd.DataFrame:
     """Flex Energy: consumo declarado em kWh dos leads criados no periodo, por Owner."""
     soql = f"""
-        SELECT Owner.Name, COUNT(Id) total_leads, SUM(Consumo_Declarado_kW__c) total_kwh
+        SELECT Owner.Name vendedor, COUNT(Id) total_leads, SUM(Consumo_Declarado_kW__c) total_kwh
         FROM Lead
         WHERE Empresa_Proprietaria__c = 'Flex Energy'
         AND CreatedDate >= {_format_date(data_inicio)}
@@ -906,7 +908,7 @@ def get_accounts_criadas_periodo(empresa: str, data_inicio: date, data_fim: date
 def get_opps_criadas_periodo(empresa: str, data_inicio: date, data_fim: date) -> pd.DataFrame:
     """Oportunidades criadas no periodo - por Owner e fase predominante."""
     soql = f"""
-        SELECT Owner.Name, StageName, COUNT(Id) total, SUM(Amount) valor
+        SELECT Owner.Name vendedor, StageName, COUNT(Id) total, SUM(Amount) valor
         FROM Opportunity
         WHERE Empresa_Proprietaria__c = '{empresa}'
         AND CreatedDate >= {_format_date(data_inicio)}
