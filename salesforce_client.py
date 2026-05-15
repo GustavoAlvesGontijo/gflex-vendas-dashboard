@@ -998,42 +998,50 @@ def get_pipeline_termometro(empresa: str) -> pd.DataFrame:
 def get_qualidade_contas_energy(data_inicio: date = None, data_fim: date = None) -> dict:
     """Snapshot de qualidade do cadastro de Account (Flex Energy).
     Retorna dict com counts conformes/inconformes por criterio.
+    Cada criterio eh executado de forma defensiva — se o campo nao existir
+    na Account, retorna None para aquele criterio (sem quebrar o painel).
     """
     where_extra = ""
     if data_inicio and data_fim:
         where_extra = f"AND CreatedDate >= {_format_date(data_inicio)} AND CreatedDate <= {_format_date(data_fim)}"
-    soql_total = f"""
-        SELECT COUNT(Id) total
-        FROM Account
+
+    def _val_safe(soql):
+        try:
+            df = _query_to_df(soql)
+            if df.empty:
+                return 0
+            return int(df["total"].iloc[0]) if "total" in df.columns and df["total"].iloc[0] else 0
+        except Exception:
+            return None  # campo inexistente ou outro erro — silencia
+
+    total = _val_safe(f"""
+        SELECT COUNT(Id) total FROM Account
         WHERE Empresa_Proprieteria__c = 'Flex Energy' {where_extra}
-    """
-    soql_cnpj = f"""
-        SELECT COUNT(Id) total
-        FROM Account
+    """)
+    razao = _val_safe(f"""
+        SELECT COUNT(Id) total FROM Account
         WHERE Empresa_Proprieteria__c = 'Flex Energy' {where_extra}
         AND Name != null
-    """
-    soql_setor = f"""
-        SELECT COUNT(Id) total
-        FROM Account
-        WHERE Empresa_Proprieteria__c = 'Flex Energy' {where_extra}
-        AND Setor__c != null
-    """
-    soql_endereco = f"""
-        SELECT COUNT(Id) total
-        FROM Account
+    """)
+    # Setor__c eh do Lead, nao da Account. Tentamos campos comuns; fallback None.
+    setor = None
+    for campo in ["Industry", "Setor_ENERGY__c", "Segmento__c"]:
+        v = _val_safe(f"""
+            SELECT COUNT(Id) total FROM Account
+            WHERE Empresa_Proprieteria__c = 'Flex Energy' {where_extra}
+            AND {campo} != null
+        """)
+        if v is not None:
+            setor = v
+            break
+    endereco = _val_safe(f"""
+        SELECT COUNT(Id) total FROM Account
         WHERE Empresa_Proprieteria__c = 'Flex Energy' {where_extra}
         AND BillingCity != null AND BillingStreet != null
-    """
-    def _val(soql):
-        df = _query_to_df(soql)
-        if df.empty:
-            return 0
-        return int(df["total"].iloc[0]) if "total" in df.columns and df["total"].iloc[0] else 0
-    total = _val(soql_total)
+    """)
     return {
-        "total": total,
-        "razao_social_ok": _val(soql_cnpj),
-        "setor_ok": _val(soql_setor),
-        "endereco_ok": _val(soql_endereco),
+        "total": total or 0,
+        "razao_social_ok": razao,
+        "setor_ok": setor,
+        "endereco_ok": endereco,
     }

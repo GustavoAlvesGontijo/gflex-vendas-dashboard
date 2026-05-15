@@ -794,6 +794,9 @@ with col_b:
         ]
         rows_html = ""
         for nome, ok in crit:
+            if ok is None:
+                rows_html += f'<tr><td>{nome}</td><td class="num"><span class="pill pill-flat">n/d</span></td><td class="num"><span class="pill pill-flat">campo não mapeado</span></td></tr>'
+                continue
             falta = total_q - ok
             pill = "pill-good" if falta == 0 else ("pill-warn" if falta/total_q < 0.3 else "pill-bad")
             rows_html += f'<tr><td>{nome}</td><td class="num">{ok}</td><td class="num"><span class="pill {pill}">{falta}</span></td></tr>'
