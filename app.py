@@ -344,6 +344,14 @@ NAV = [
         "desc": "Funil de conversao por status, origens, %F1 (criados+convertidos), evolucao por empresa.",
         "tag": None,
     },
+    {
+        "url": "./fechamento_semanal",
+        "icon_name": "file-text",
+        "color": "#EC8500",
+        "title": "Fechamento Semanal",
+        "desc": "Relatorio comercial semanal por empresa: KPIs vs semana anterior, pipeline, vendas MTD, funil, comparativo 4 semanas + retrospectiva. Piloto Flex Energy (kWh).",
+        "tag": "Novo",
+    },
 ]
 
 cards_html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">'

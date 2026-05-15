@@ -800,3 +800,238 @@ def get_leads_por_proprietario(empresa: str = None, data_inicio: date = None, da
         ORDER BY COUNT(Id) DESC
     """
     return _query_to_df(soql)
+
+
+# ============================================================
+# FECHAMENTO SEMANAL — queries bound to arbitrary date ranges
+# Doc: _Brain/Processos/Flex Energy - Fechamento Semanal Comercial.md
+# ============================================================
+
+def _date_only(d: date) -> str:
+    """Formata data como YYYY-MM-DD (sem timezone) — para campos Date do SF."""
+    return d.strftime("%Y-%m-%d")
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_leads_periodo(empresa: str, data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Contagem total de leads criados no periodo (com IsConverted para conta de convertidos)."""
+    soql = f"""
+        SELECT IsConverted, COUNT(Id) total
+        FROM Lead
+        WHERE Empresa_Proprietaria__c = '{empresa}'
+        AND CreatedDate >= {_format_date(data_inicio)}
+        AND CreatedDate <= {_format_date(data_fim)}
+        GROUP BY IsConverted
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_leads_origem_periodo(empresa: str, data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Leads por origem (LeadSource) no periodo."""
+    soql = f"""
+        SELECT LeadSource, COUNT(Id) total
+        FROM Lead
+        WHERE Empresa_Proprietaria__c = '{empresa}'
+        AND CreatedDate >= {_format_date(data_inicio)}
+        AND CreatedDate <= {_format_date(data_fim)}
+        GROUP BY LeadSource
+        ORDER BY COUNT(Id) DESC
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_leads_status_periodo(empresa: str, data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Leads por Status no periodo (snapshot de quem foi criado e onde esta hoje)."""
+    soql = f"""
+        SELECT Status, COUNT(Id) total
+        FROM Lead
+        WHERE Empresa_Proprietaria__c = '{empresa}'
+        AND CreatedDate >= {_format_date(data_inicio)}
+        AND CreatedDate <= {_format_date(data_fim)}
+        GROUP BY Status
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_leads_vendedor_periodo(empresa: str, data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Leads por proprietario com IsConverted no periodo (para tabela de vendedores)."""
+    soql = f"""
+        SELECT Owner.Name, Status, IsConverted, COUNT(Id) total
+        FROM Lead
+        WHERE Empresa_Proprietaria__c = '{empresa}'
+        AND CreatedDate >= {_format_date(data_inicio)}
+        AND CreatedDate <= {_format_date(data_fim)}
+        GROUP BY Owner.Name, Status, IsConverted
+        ORDER BY COUNT(Id) DESC
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_energy_consumo_declarado_periodo(data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Flex Energy: consumo declarado em kWh dos leads criados no periodo, por Owner."""
+    soql = f"""
+        SELECT Owner.Name, COUNT(Id) total_leads, SUM(Consumo_Declarado_kW__c) total_kwh
+        FROM Lead
+        WHERE Empresa_Proprietaria__c = 'Flex Energy'
+        AND CreatedDate >= {_format_date(data_inicio)}
+        AND CreatedDate <= {_format_date(data_fim)}
+        AND Consumo_Declarado_kW__c != null
+        GROUP BY Owner.Name
+        ORDER BY SUM(Consumo_Declarado_kW__c) DESC
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_accounts_criadas_periodo(empresa: str, data_inicio: date, data_fim: date) -> int:
+    """Contas Account criadas no periodo. ATENCAO: campo na Account eh 'Empresa_Proprieteria__c' (typo)."""
+    soql = f"""
+        SELECT COUNT(Id) total
+        FROM Account
+        WHERE Empresa_Proprieteria__c = '{empresa}'
+        AND CreatedDate >= {_format_date(data_inicio)}
+        AND CreatedDate <= {_format_date(data_fim)}
+    """
+    df = _query_to_df(soql)
+    if df.empty:
+        return 0
+    return int(df["total"].iloc[0]) if "total" in df.columns else 0
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_opps_criadas_periodo(empresa: str, data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Oportunidades criadas no periodo - por Owner e fase predominante."""
+    soql = f"""
+        SELECT Owner.Name, StageName, COUNT(Id) total, SUM(Amount) valor
+        FROM Opportunity
+        WHERE Empresa_Proprietaria__c = '{empresa}'
+        AND CreatedDate >= {_format_date(data_inicio)}
+        AND CreatedDate <= {_format_date(data_fim)}
+        AND Owner.Name != 'Pos Venda GFlex'
+        GROUP BY Owner.Name, StageName
+        ORDER BY COUNT(Id) DESC
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_opps_ganhas_periodo(empresa: str, data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Vendas (Fechado Ganho) no periodo - lista detalhada."""
+    soql = f"""
+        SELECT Id, Name, Owner.Name, Account.Name, Amount, CloseDate, Tipo_de_Conta_ENERGY__c
+        FROM Opportunity
+        WHERE Empresa_Proprietaria__c = '{empresa}'
+        AND StageName = 'Fechado Ganho'
+        AND CloseDate >= {_date_only(data_inicio)}
+        AND CloseDate <= {_date_only(data_fim)}
+        AND Owner.Name != 'Pos Venda GFlex'
+        ORDER BY CloseDate DESC
+        LIMIT 500
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_energy_kwh_periodo(data_inicio: date, data_fim: date, ganhas: bool = False) -> dict:
+    """Flex Energy: soma kWh do periodo. Se ganhas=True, filtra Fechado Ganho com CloseDate; senao Opps criadas no periodo (orcado)."""
+    if ganhas:
+        soql = f"""
+            SELECT SUM(Quantity) total_kwh, COUNT(Id) total_opps
+            FROM OpportunityLineItem
+            WHERE Opportunity.Empresa_Proprietaria__c = 'Flex Energy'
+            AND Opportunity.StageName = 'Fechado Ganho'
+            AND Opportunity.CloseDate >= {_date_only(data_inicio)}
+            AND Opportunity.CloseDate <= {_date_only(data_fim)}
+        """
+    else:
+        soql = f"""
+            SELECT SUM(Quantity) total_kwh, COUNT(Id) total_opps
+            FROM OpportunityLineItem
+            WHERE Opportunity.Empresa_Proprietaria__c = 'Flex Energy'
+            AND Opportunity.CreatedDate >= {_format_date(data_inicio)}
+            AND Opportunity.CreatedDate <= {_format_date(data_fim)}
+        """
+    df = _query_to_df(soql)
+    if df.empty:
+        return {"kwh": 0.0, "opps": 0}
+    kwh = float(df["total_kwh"].iloc[0]) if df["total_kwh"].iloc[0] else 0.0
+    opps = int(df["total_opps"].iloc[0]) if df["total_opps"].iloc[0] else 0
+    return {"kwh": kwh, "opps": opps}
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_pipeline_termometro(empresa: str) -> pd.DataFrame:
+    """Pipeline em aberto por StageName + Temperatura (exclui pos-venda).
+    Volume em kWh para Energy (via OpportunityLineItem), Amount para demais.
+    """
+    if empresa == "Flex Energy":
+        soql = """
+            SELECT Opportunity.StageName fase,
+                   Opportunity.Temperatura_da_Oportunidade_Energy__c temp,
+                   COUNT_DISTINCT(Opportunity.Id) total,
+                   SUM(Quantity) volume_kwh
+            FROM OpportunityLineItem
+            WHERE Opportunity.Empresa_Proprietaria__c = 'Flex Energy'
+            AND Opportunity.StageName NOT IN ('Fechado Ganho', 'Fechado Perdido')
+            AND Opportunity.Owner.Name != 'Pos Venda GFlex'
+            GROUP BY Opportunity.StageName, Opportunity.Temperatura_da_Oportunidade_Energy__c
+        """
+    else:
+        soql = f"""
+            SELECT StageName fase, COUNT(Id) total, SUM(Amount) volume_rs
+            FROM Opportunity
+            WHERE Empresa_Proprietaria__c = '{empresa}'
+            AND StageName NOT IN ('Fechado Ganho', 'Fechado Perdido')
+            AND Owner.Name != 'Pos Venda GFlex'
+            GROUP BY StageName
+        """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_qualidade_contas_energy(data_inicio: date = None, data_fim: date = None) -> dict:
+    """Snapshot de qualidade do cadastro de Account (Flex Energy).
+    Retorna dict com counts conformes/inconformes por criterio.
+    """
+    where_extra = ""
+    if data_inicio and data_fim:
+        where_extra = f"AND CreatedDate >= {_format_date(data_inicio)} AND CreatedDate <= {_format_date(data_fim)}"
+    soql_total = f"""
+        SELECT COUNT(Id) total
+        FROM Account
+        WHERE Empresa_Proprieteria__c = 'Flex Energy' {where_extra}
+    """
+    soql_cnpj = f"""
+        SELECT COUNT(Id) total
+        FROM Account
+        WHERE Empresa_Proprieteria__c = 'Flex Energy' {where_extra}
+        AND Name != null
+    """
+    soql_setor = f"""
+        SELECT COUNT(Id) total
+        FROM Account
+        WHERE Empresa_Proprieteria__c = 'Flex Energy' {where_extra}
+        AND Setor__c != null
+    """
+    soql_endereco = f"""
+        SELECT COUNT(Id) total
+        FROM Account
+        WHERE Empresa_Proprieteria__c = 'Flex Energy' {where_extra}
+        AND BillingCity != null AND BillingStreet != null
+    """
+    def _val(soql):
+        df = _query_to_df(soql)
+        if df.empty:
+            return 0
+        return int(df["total"].iloc[0]) if "total" in df.columns and df["total"].iloc[0] else 0
+    total = _val(soql_total)
+    return {
+        "total": total,
+        "razao_social_ok": _val(soql_cnpj),
+        "setor_ok": _val(soql_setor),
+        "endereco_ok": _val(soql_endereco),
+    }
