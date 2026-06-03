@@ -60,9 +60,18 @@ def _pct_diff(atual, anterior):
 ENERGY = "Flex Energy"
 CASAS = ["Interno", "Externo", "Representantes", "Média Tensão"]
 
-def _normalize(s: str) -> str:
-    """Lower + remove acentos (SF tem dados mistos com/sem acento)."""
+def _normalize(s) -> str:
+    """Lower + remove acentos. Tolerante a None, NaN, float, etc."""
     import unicodedata
+    if s is None: return ""
+    try:
+        if pd.isna(s): return ""
+    except (TypeError, ValueError):
+        pass
+    try:
+        s = str(s)
+    except Exception:
+        return ""
     if not s: return ""
     return ''.join(c for c in unicodedata.normalize('NFD', s.lower()) if unicodedata.category(c) != 'Mn')
 
