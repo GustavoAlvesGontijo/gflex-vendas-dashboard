@@ -350,6 +350,14 @@ NAV = [
         "color": "#EC8500",
         "title": "Fechamento Semanal",
         "desc": "Relatorio comercial semanal por empresa: KPIs vs semana anterior, pipeline, vendas MTD, funil, comparativo 4 semanas + retrospectiva. Piloto Flex Energy (kWh).",
+        "tag": None,
+    },
+    {
+        "url": "./acompanhamento",
+        "icon_name": "calendar",
+        "color": "#06b6d4",
+        "title": "Acompanhamento",
+        "desc": "Diario, semanal, mensal ou periodo custom por empresa: leads criados/convertidos, opps criadas, em negociacao, contratos, vendas. Filtro de origem opcional.",
         "tag": "Novo",
     },
 ]

@@ -1045,3 +1045,130 @@ def get_qualidade_contas_energy(data_inicio: date = None, data_fim: date = None)
         "setor_ok": setor,
         "endereco_ok": endereco,
     }
+
+
+# ============================================================
+# ACOMPANHAMENTO MULTI-EMPRESA — queries unificadas por periodo
+# Doc: pages/5_acompanhamento.py
+# Cada query roda 1x e retorna agregado por empresa+origem em vez
+# de uma chamada por empresa.
+# ============================================================
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_leads_criados_unificado(data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Leads criados no periodo: empresa+origem+IsConverted+count."""
+    soql = f"""
+        SELECT Empresa_Proprietaria__c, LeadSource, IsConverted, COUNT(Id) total
+        FROM Lead
+        WHERE CreatedDate >= {_format_date(data_inicio)}
+        AND CreatedDate <= {_format_date(data_fim)}
+        GROUP BY Empresa_Proprietaria__c, LeadSource, IsConverted
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_leads_convertidos_unificado(data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Leads convertidos no periodo (ConvertedDate): empresa+origem+count.
+    Independe de quando o lead foi criado — pega quem virou conversao no periodo."""
+    soql = f"""
+        SELECT Empresa_Proprietaria__c, LeadSource, COUNT(Id) total
+        FROM Lead
+        WHERE IsConverted = true
+        AND ConvertedDate >= {_date_only(data_inicio)}
+        AND ConvertedDate <= {_date_only(data_fim)}
+        GROUP BY Empresa_Proprietaria__c, LeadSource
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_opps_criadas_unificado(data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Opps criadas no periodo: empresa+origem+count+SUM(Amount)."""
+    soql = f"""
+        SELECT Empresa_Proprietaria__c, LeadSource, COUNT(Id) total, SUM(Amount) valor
+        FROM Opportunity
+        WHERE CreatedDate >= {_format_date(data_inicio)}
+        AND CreatedDate <= {_format_date(data_fim)}
+        AND Owner.Name != 'Pos Venda GFlex'
+        GROUP BY Empresa_Proprietaria__c, LeadSource
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_opps_em_fase_unificado(data_inicio: date, data_fim: date, fase: str) -> pd.DataFrame:
+    """Opps atualmente em fase X com LastStageChangeDate no periodo.
+    Aproximacao para "moveu PARA fase X no periodo" — limitacao: nao detecta
+    opps que ja saíram da fase. Para 100% preciso seria OpportunityFieldHistory."""
+    soql = f"""
+        SELECT Empresa_Proprietaria__c, LeadSource, COUNT(Id) total, SUM(Amount) valor
+        FROM Opportunity
+        WHERE StageName = '{fase}'
+        AND LastStageChangeDate >= {_format_date(data_inicio)}
+        AND LastStageChangeDate <= {_format_date(data_fim)}
+        AND Owner.Name != 'Pos Venda GFlex'
+        GROUP BY Empresa_Proprietaria__c, LeadSource
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_opps_ganhas_unificado(data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Opps ganhas no periodo (CloseDate): empresa+origem+count+SUM(Amount)."""
+    soql = f"""
+        SELECT Empresa_Proprietaria__c, LeadSource, COUNT(Id) total, SUM(Amount) valor
+        FROM Opportunity
+        WHERE StageName = 'Fechado Ganho'
+        AND CloseDate >= {_date_only(data_inicio)}
+        AND CloseDate <= {_date_only(data_fim)}
+        AND Owner.Name != 'Pos Venda GFlex'
+        GROUP BY Empresa_Proprietaria__c, LeadSource
+    """
+    return _query_to_df(soql)
+
+
+# Energy kWh por modo + periodo — soma kWh via OpportunityLineItem
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_energy_kwh_unificado(data_inicio: date, data_fim: date, modo: str) -> pd.DataFrame:
+    """kWh Flex Energy por origem.
+    modo: 'criadas' (Opportunity.CreatedDate),
+          'negociacao' (StageName=Negociacao + LSC),
+          'contrato' (StageName=Contrato + LSC),
+          'ganhas' (StageName=Fechado Ganho + CloseDate)
+    """
+    if modo == "criadas":
+        where = (
+            f"Opportunity.CreatedDate >= {_format_date(data_inicio)} "
+            f"AND Opportunity.CreatedDate <= {_format_date(data_fim)}"
+        )
+    elif modo == "negociacao":
+        where = (
+            "Opportunity.StageName = 'Negociação' "
+            f"AND Opportunity.LastStageChangeDate >= {_format_date(data_inicio)} "
+            f"AND Opportunity.LastStageChangeDate <= {_format_date(data_fim)}"
+        )
+    elif modo == "contrato":
+        where = (
+            "Opportunity.StageName = 'Contrato' "
+            f"AND Opportunity.LastStageChangeDate >= {_format_date(data_inicio)} "
+            f"AND Opportunity.LastStageChangeDate <= {_format_date(data_fim)}"
+        )
+    elif modo == "ganhas":
+        where = (
+            "Opportunity.StageName = 'Fechado Ganho' "
+            f"AND Opportunity.CloseDate >= {_date_only(data_inicio)} "
+            f"AND Opportunity.CloseDate <= {_date_only(data_fim)}"
+        )
+    else:
+        raise ValueError(f"modo invalido: {modo}")
+
+    soql = f"""
+        SELECT Opportunity.LeadSource origem, SUM(Quantity) kwh, COUNT(Id) opps
+        FROM OpportunityLineItem
+        WHERE Opportunity.Empresa_Proprietaria__c = 'Flex Energy'
+        AND Opportunity.Owner.Name != 'Pos Venda GFlex'
+        AND {where}
+        GROUP BY Opportunity.LeadSource
+    """
+    return _query_to_df(soql)
