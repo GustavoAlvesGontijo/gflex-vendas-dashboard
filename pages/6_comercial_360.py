@@ -60,18 +60,28 @@ def _pct_diff(atual, anterior):
 ENERGY = "Flex Energy"
 CASAS = ["Interno", "Externo", "Representantes", "Média Tensão"]
 
+def _normalize(s: str) -> str:
+    """Lower + remove acentos (SF tem dados mistos com/sem acento)."""
+    import unicodedata
+    if not s: return ""
+    return ''.join(c for c in unicodedata.normalize('NFD', s.lower()) if unicodedata.category(c) != 'Mn')
+
 def classificar_casa(title: str, tipo_conta: str) -> str:
-    """Aplica regras dos dashboards SF para classificar a casa."""
-    t = (tipo_conta or "").strip()
-    titlel = (title or "").lower()
-    if t == "Média Tensão":
+    """Aplica regras dos dashboards SF para classificar a casa.
+    Tolerante a variações sem acento (Media Tensao vs Média Tensão)."""
+    tipo_n = _normalize(tipo_conta)
+    titlel = _normalize(title)
+    if "media tensao" in tipo_n:
         return "Média Tensão"
     if "interno" in titlel:
         return "Interno"
     if "externo" in titlel:
         return "Externo"
-    if "representante" in titlel:
+    if "representante" in titlel or "gestora dos representante" in titlel:
         return "Representantes"
+    # Fallback: gestores/coordenadores sem categoria explicita -> Interno (gerencial)
+    if any(k in titlel for k in ("gerente", "coordenador", "diretor", "gestor")):
+        return "Interno"
     return "Outros"
 
 # ============================================================
