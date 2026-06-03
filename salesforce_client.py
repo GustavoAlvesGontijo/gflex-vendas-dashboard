@@ -1128,6 +1128,170 @@ def get_opps_ganhas_unificado(data_inicio: date, data_fim: date) -> pd.DataFrame
     return _query_to_df(soql)
 
 
+# ============================================================
+# COMERCIAL 360 — queries refinadas com filtros Yago (silenciosos)
+# Filtros padrao aplicados em todas:
+#  - Owner.Name != 'Pos Venda GFlex'
+#  - concessionaria_energia__c != 'Elektro' (somente Energy)
+# ============================================================
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_energy_opps_por_casa_unificado(data_inicio: date, data_fim: date, modo: str) -> pd.DataFrame:
+    """Opps Energy agrupadas por (Owner.Title, Tipo_de_Conta_ENERGY__c).
+    A classificacao da casa (Interno/Externo/Representante/MT) e feita em Python.
+    modo: 'criadas'|'negociacao'|'contrato'|'ganhas'|'perdidas'.
+    """
+    if modo == "criadas":
+        where = f"CreatedDate >= {_format_date(data_inicio)} AND CreatedDate <= {_format_date(data_fim)}"
+    elif modo == "negociacao":
+        where = (
+            "StageName = 'Negociação' "
+            f"AND LastStageChangeDate >= {_format_date(data_inicio)} "
+            f"AND LastStageChangeDate <= {_format_date(data_fim)}"
+        )
+    elif modo == "contrato":
+        where = (
+            "StageName = 'Contrato' "
+            f"AND LastStageChangeDate >= {_format_date(data_inicio)} "
+            f"AND LastStageChangeDate <= {_format_date(data_fim)}"
+        )
+    elif modo == "ganhas":
+        where = (
+            "StageName = 'Fechado Ganho' "
+            f"AND CloseDate >= {_date_only(data_inicio)} "
+            f"AND CloseDate <= {_date_only(data_fim)}"
+        )
+    elif modo == "perdidas":
+        where = (
+            "StageName = 'Fechado Perdido' "
+            f"AND CloseDate >= {_date_only(data_inicio)} "
+            f"AND CloseDate <= {_date_only(data_fim)}"
+        )
+    else:
+        raise ValueError(modo)
+    soql = f"""
+        SELECT Owner.Title title, Tipo_de_Conta_ENERGY__c tipo_conta,
+               COUNT(Id) total, SUM(Amount) valor
+        FROM Opportunity
+        WHERE Empresa_Proprietaria__c = 'Flex Energy'
+        AND Owner.Name != 'Pos Venda GFlex'
+        AND concessionaria_energia__c != 'Elektro'
+        AND {where}
+        GROUP BY Owner.Title, Tipo_de_Conta_ENERGY__c
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_energy_kwh_por_casa_unificado(data_inicio: date, data_fim: date, modo: str) -> pd.DataFrame:
+    """kWh Energy por (Owner.Title, Tipo_de_Conta_ENERGY) via OpportunityLineItem."""
+    if modo == "criadas":
+        where = (f"Opportunity.CreatedDate >= {_format_date(data_inicio)} "
+                 f"AND Opportunity.CreatedDate <= {_format_date(data_fim)}")
+    elif modo == "negociacao":
+        where = ("Opportunity.StageName = 'Negociação' "
+                 f"AND Opportunity.LastStageChangeDate >= {_format_date(data_inicio)} "
+                 f"AND Opportunity.LastStageChangeDate <= {_format_date(data_fim)}")
+    elif modo == "contrato":
+        where = ("Opportunity.StageName = 'Contrato' "
+                 f"AND Opportunity.LastStageChangeDate >= {_format_date(data_inicio)} "
+                 f"AND Opportunity.LastStageChangeDate <= {_format_date(data_fim)}")
+    elif modo == "ganhas":
+        where = ("Opportunity.StageName = 'Fechado Ganho' "
+                 f"AND Opportunity.CloseDate >= {_date_only(data_inicio)} "
+                 f"AND Opportunity.CloseDate <= {_date_only(data_fim)}")
+    else:
+        raise ValueError(modo)
+    soql = f"""
+        SELECT Opportunity.Owner.Title title, Opportunity.Tipo_de_Conta_ENERGY__c tipo_conta,
+               SUM(Quantity) kwh, COUNT_DISTINCT(Opportunity.Id) opps
+        FROM OpportunityLineItem
+        WHERE Opportunity.Empresa_Proprietaria__c = 'Flex Energy'
+        AND Opportunity.Owner.Name != 'Pos Venda GFlex'
+        AND Opportunity.concessionaria_energia__c != 'Elektro'
+        AND {where}
+        GROUP BY Opportunity.Owner.Title, Opportunity.Tipo_de_Conta_ENERGY__c
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_energy_leads_por_casa_unificado(data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Leads Energy criados no periodo agrupados por Owner.Title + Tipo_de_Conta_de_Luz."""
+    soql = f"""
+        SELECT Owner.Title title, Tipo_de_Conta_de_Luz__c tipo_conta, COUNT(Id) total
+        FROM Lead
+        WHERE Empresa_Proprietaria__c = 'Flex Energy'
+        AND CreatedDate >= {_format_date(data_inicio)}
+        AND CreatedDate <= {_format_date(data_fim)}
+        GROUP BY Owner.Title, Tipo_de_Conta_de_Luz__c
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_energy_leads_conv_por_casa_unificado(data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Leads Energy convertidos no periodo (ConvertedDate) agrupados por Owner.Title + Tipo_de_Conta_de_Luz."""
+    soql = f"""
+        SELECT Owner.Title title, Tipo_de_Conta_de_Luz__c tipo_conta, COUNT(Id) total
+        FROM Lead
+        WHERE Empresa_Proprietaria__c = 'Flex Energy'
+        AND IsConverted = true
+        AND ConvertedDate >= {_date_only(data_inicio)}
+        AND ConvertedDate <= {_date_only(data_fim)}
+        GROUP BY Owner.Title, Tipo_de_Conta_de_Luz__c
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_perdas_unificado(data_inicio: date, data_fim: date) -> pd.DataFrame:
+    """Opps perdidas (Fechado Perdido) no periodo + Motivo_da_Perda por empresa."""
+    soql = f"""
+        SELECT Empresa_Proprietaria__c, Motivo_da_Perda__c motivo,
+               COUNT(Id) total, SUM(Amount) valor
+        FROM Opportunity
+        WHERE StageName = 'Fechado Perdido'
+        AND CloseDate >= {_date_only(data_inicio)}
+        AND CloseDate <= {_date_only(data_fim)}
+        AND Owner.Name != 'Pos Venda GFlex'
+        GROUP BY Empresa_Proprietaria__c, Motivo_da_Perda__c
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_pipeline_aberto_snapshot() -> pd.DataFrame:
+    """Snapshot do pipeline aberto AGORA por empresa + fase + valor.
+    Para Energy: tambem retorna kWh via OpportunityLineItem (em query separada).
+    """
+    soql = """
+        SELECT Empresa_Proprietaria__c, StageName,
+               COUNT(Id) total, SUM(Amount) valor
+        FROM Opportunity
+        WHERE StageName IN ('Novo','Em Análise','Contato Ativo','Contato Passivo','Em Cotação','Negociação','Contrato')
+        AND Owner.Name != 'Pos Venda GFlex'
+        GROUP BY Empresa_Proprietaria__c, StageName
+    """
+    return _query_to_df(soql)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def get_pipeline_aberto_energy_kwh_snapshot() -> pd.DataFrame:
+    """Snapshot kWh Energy em pipeline aberto, por fase + Tipo_de_Conta."""
+    soql = """
+        SELECT Opportunity.StageName fase, Opportunity.Tipo_de_Conta_ENERGY__c tipo_conta,
+               COUNT_DISTINCT(Opportunity.Id) opps, SUM(Quantity) kwh
+        FROM OpportunityLineItem
+        WHERE Opportunity.Empresa_Proprietaria__c = 'Flex Energy'
+        AND Opportunity.StageName IN ('Novo','Em Análise','Contato Ativo','Contato Passivo','Em Cotação','Negociação','Contrato')
+        AND Opportunity.Owner.Name != 'Pos Venda GFlex'
+        AND Opportunity.concessionaria_energia__c != 'Elektro'
+        GROUP BY Opportunity.StageName, Opportunity.Tipo_de_Conta_ENERGY__c
+    """
+    return _query_to_df(soql)
+
+
 # Energy kWh por modo + periodo — soma kWh via OpportunityLineItem
 @st.cache_data(ttl=CACHE_TTL_SECONDS)
 def get_energy_kwh_unificado(data_inicio: date, data_fim: date, modo: str) -> pd.DataFrame:

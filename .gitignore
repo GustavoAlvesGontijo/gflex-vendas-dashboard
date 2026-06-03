@@ -2,3 +2,9 @@
 __pycache__/
 *.pyc
 .streamlit/secrets.toml
+_inspect_batch.py
+_inspect_dashboard.py
+_inspect_err.log
+_summary_dashboards.py
+_dashboards_metadata.md
+_dashboards_summary.md

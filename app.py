@@ -353,11 +353,11 @@ NAV = [
         "tag": None,
     },
     {
-        "url": "./acompanhamento",
-        "icon_name": "calendar",
+        "url": "./comercial_360",
+        "icon_name": "chart",
         "color": "#06b6d4",
-        "title": "Acompanhamento",
-        "desc": "Diario, semanal, mensal ou periodo custom por empresa: leads criados/convertidos, opps criadas, em negociacao, contratos, vendas. Filtro de origem opcional.",
+        "title": "Comercial 360",
+        "desc": "Mapa de gargalos diario/semanal/mensal por empresa. Energy auto-expandida em 4 casas (Interno/Externo/Repres/MT). Funil visual, perdas com motivos, pipeline atual. Filtros Yago aplicados.",
         "tag": "Novo",
     },
 ]
